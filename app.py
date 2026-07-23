@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
-from auth_handler import get_credentials, revoke_token, is_authenticated
+from auth_handler import get_credentials, login_button, logout, is_authenticated
 from calendar_manager import fetch_events, create_event, update_event, delete_event, set_attendance, check_availability
 
 WEEKDAY_NAMES = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
@@ -213,17 +213,12 @@ def login_section():
     if is_authenticated():
         st.sidebar.success("✓ Авторизован")
         if st.sidebar.button("Выйти", use_container_width=True):
-            revoke_token()
+            logout()
             st.rerun()
         return True
     else:
         st.sidebar.warning("Не авторизован")
-        if st.sidebar.button("Войти через Google", use_container_width=True):
-            creds = get_credentials()
-            if creds:
-                st.rerun()
-            else:
-                st.sidebar.error("Ошибка входа")
+        login_button()
         return False
 
 
