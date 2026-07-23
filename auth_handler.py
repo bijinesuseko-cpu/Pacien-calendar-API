@@ -67,7 +67,7 @@ def is_authenticated() -> bool:
     if not os.path.exists(TOKEN_FILE):
         return False
     try:
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+    creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
     except Exception:
         return False
     if creds and creds.valid:
