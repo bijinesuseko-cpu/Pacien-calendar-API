@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+env/
+env1/
+.venv/
+venv/
+ENV/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Streamlit
+.streamlit/
+
+# Google credentials - НЕ КОММИТИТЬ!
+credentials.json
+token.json
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Ruff
+.ruff_cache/
+
+# Project files
+*.pyproj
+*.slnx
+opencode.json
