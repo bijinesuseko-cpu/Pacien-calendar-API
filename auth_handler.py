@@ -86,19 +86,14 @@ def _popup_login() -> bool:
 
     # ── Check OAuth callback ──
     params = st.query_params
-    if "code" in params and "state" in params:
+    if "code" in params:
         code = params["code"]
-        state = params["state"]
-        expected_state = st.session_state.get("_oauth_state", "")
 
         # Clear params so they don't trigger again
         del params["code"]
-        del params["state"]
+        if "state" in params:
+            del params["state"]
         st.query_params = params
-
-        if state != expected_state:
-            st.error("Ошибка: несовпадение state. Попробуйте снова.")
-            return False
 
         body = urllib.parse.urlencode({
             "code": code,
