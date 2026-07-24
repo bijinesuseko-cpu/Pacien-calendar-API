@@ -449,6 +449,7 @@ def render_calendar_view(events: list[dict]):
     for e in events:
         events_by_date.setdefault(e["date"], []).append(e)
 
+    # Day headers
     cols = st.columns(7)
     for i, col in enumerate(cols):
         with col:
@@ -459,6 +460,7 @@ def render_calendar_view(events: list[dict]):
                 unsafe_allow_html=True,
             )
 
+    # Calendar grid
     cells = [None] * start_weekday + list(range(1, total_days + 1))
 
     for week_start in range(0, len(cells), 7):
@@ -471,45 +473,77 @@ def render_calendar_view(events: list[dict]):
                     d = date(cal_year, cal_month, day_num)
                     day_str = d.isoformat()
                     is_today = d == today
+                    is_selected = st.session_state.get("cal_selected_day") == day_str
                     day_events = events_by_date.get(day_str, [])
 
-                    color = "var(--accent)" if is_today else "var(--text-primary)"
-                    bg = "var(--accent-subtle)" if is_today else "var(--bg-card)"
-                    border = "1px solid var(--accent)" if is_today else "1px solid var(--border-light)"
+                    # Day number button
+                    btn_type = "primary" if is_today or is_selected else "secondary"
+                    if st.button(str(day_num), key=f"cal_day_{day_str}", use_container_width=True, type=btn_type):
+                        st.session_state["cal_selected_day"] = day_str
+                        st.session_state["cal_selected_date"] = d
+                        st.rerun()
 
-                    events_html = ""
+                    # Event dots
                     for ev in day_events[:3]:
                         icon = attendance_icon(ev.get("attendance", ""))
-                        events_html += (
-                            f"<div style='font-size:0.7rem; padding:2px 4px; margin:1px 0; "
-                            f"background:var(--bg-secondary); border-radius:4px; overflow:hidden; "
-                            f"text-overflow:ellipsis; white-space:nowrap; color:var(--text-secondary);'>"
-                            f"{icon} {ev['time']} {ev['client_name']}</div>"
+                        st.markdown(
+                            f"<div style='font-size:0.65rem; padding:1px 4px; margin:1px 0; "
+                            f"overflow:hidden; text-overflow:ellipsis; white-space:nowrap; "
+                            f"color:var(--text-secondary);'>"
+                            f"{icon} {ev['time']}</div>",
+                            unsafe_allow_html=True,
                         )
                     if len(day_events) > 3:
-                        events_html += f"<div style='font-size:0.65rem; color:var(--text-muted);'>+{len(day_events) - 3}</div>"
-
-                    st.markdown(
-                        f"<div style='border:{border}; border-radius:8px; background:{bg}; "
-                        f"padding:6px; min-height:70px; margin-bottom:4px;'>"
-                        f"<div style='text-align:center; color:{color}; font-weight:600; "
-                        f"font-size:0.95em;'>{day_num}</div>"
-                        f"{events_html}"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                    if day_events:
-                        with st.popover(str(len(day_events)), key=f"pop_{day_str}"):
-                            for ev in day_events:
-                                icon = attendance_icon(ev.get("attendance", ""))
-                                st.markdown(f"{icon} **{ev['time']}** {ev['client_name']}")
-                                st.caption(f"{ev['service']}{' · ' + ev['phone'] if ev.get('phone') else ''}")
-                                if ev.get('notes'):
-                                    st.caption(f"📝 {ev['notes']}")
-                                st.divider()
+                        st.markdown(f"<div style='font-size:0.6rem; color:var(--text-muted);'>+{len(day_events) - 3}</div>", unsafe_allow_html=True)
                 else:
-                    st.markdown("<div style='min-height:70px;'></div>", unsafe_allow_html=True)
+                    st.markdown("<div style='height:60px;'></div>", unsafe_allow_html=True)
+
+    # ── Selected day view ──
+    if "cal_selected_day" in st.session_state:
+        selected = st.session_state["cal_selected_day"]
+        selected_d = st.session_state.get("cal_selected_date", today)
+        day_events = [e for e in events if e["date"] == selected]
+
+        st.divider()
+        st.markdown(f"### {selected_d.day} {MONTH_NAMES[selected_d.month]} {selected_d.year} — {format_weekday_ru(selected_d)}")
+
+        if day_events:
+            for ev in day_events:
+                with st.container(border=False):
+                    c1, c2, c3, c4 = st.columns([1, 3, 2, 1.5])
+                    with c1:
+                        st.markdown(f"**{ev['time']}**")
+                        st.caption(f"{ev['duration']} мин")
+                    with c2:
+                        st.markdown(f"**{ev['client_name']}**")
+                        info = [ev['service']]
+                        if ev.get('phone'):
+                            info.append(ev['phone'])
+                        st.caption(" · ".join(info))
+                        if ev.get('notes'):
+                            st.caption(f"📝 {ev['notes']}")
+                    with c3:
+                        st.markdown(attendance_badge(ev.get("attendance", "")), unsafe_allow_html=True)
+                    with c4:
+                        c4a, c4b, c4c = st.columns(3)
+                        with c4a:
+                            if st.button("✅", key=f"arr_cal_{ev['id']}", help="Пришёл"):
+                                set_attendance(ev["id"], "arrived")
+                                st.rerun()
+                        with c4b:
+                            if st.button("❌", key=f"miss_cal_{ev['id']}", help="Не пришёл"):
+                                set_attendance(ev["id"], "missed")
+                                st.rerun()
+                        with c4c:
+                            if st.button("✏️", key=f"edit_cal_{ev['id']}", help="Изменить"):
+                                st.session_state["editing_event"] = ev
+                                st.rerun()
+                st.divider()
+        else:
+            st.info("Нет записей на этот день")
+
+        st.divider()
+        booking_form(default_date=selected_d, form_key="booking_form_cal")
 
 
 def edit_event_form():
@@ -566,8 +600,8 @@ def edit_event_form():
                 st.error(str(e))
 
 
-def booking_form():
-    with st.form("booking_form", clear_on_submit=True):
+def booking_form(default_date: date | None = None, form_key: str = "booking_form"):
+    with st.form(form_key, clear_on_submit=True):
         st.markdown("### Новая запись")
 
         col1, col2 = st.columns(2)
@@ -578,7 +612,7 @@ def booking_form():
             service = st.selectbox("Услуга", ["Первичный прием", "Повторный прием"])
 
         with col2:
-            booking_date = st.date_input("Дата", value=date.today())
+            booking_date = st.date_input("Дата", value=default_date or date.today())
             booking_time = st.time_input("Время", value=datetime.now().replace(second=0, microsecond=0))
             duration = st.selectbox("Длительность", [30, 60, 90, 120], index=1)
 
@@ -655,8 +689,10 @@ def main():
         else:
             render_calendar_view(events)
 
-        st.divider()
-        booking_form()
+        # Default form — не показывать в календаре, там своя форма при выборе дня
+        if view_mode != "Календарь":
+            st.divider()
+            booking_form()
 
 
 if __name__ == "__main__":
