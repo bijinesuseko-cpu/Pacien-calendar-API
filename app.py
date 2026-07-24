@@ -613,7 +613,15 @@ def booking_form(default_date: date | None = None, form_key: str = "booking_form
 
         with col2:
             booking_date = st.date_input("Дата", value=default_date or date.today())
-            booking_time = st.time_input("Время", value=datetime.now().replace(second=0, microsecond=0))
+            # С 11:00 до 18:30 с шагом 30 мин
+            time_options = [f"{h:02d}:{m:02d}" for h in range(11, 19) for m in (0, 30)]
+            time_idx = 0  # 11:00
+            now = datetime.now()
+            default_time = f"{now.hour:02d}:{now.minute // 30 * 30:02d}"
+            if default_time in time_options:
+                time_idx = time_options.index(default_time)
+            booking_time_str = st.selectbox("Время", time_options, index=time_idx)
+            booking_time = datetime.strptime(booking_time_str, "%H:%M").time()
             duration = st.selectbox("Длительность", [30, 60, 90, 120], index=1)
 
         notes = st.text_area("Заметка", placeholder="Дополнительная информация...", height=80)
@@ -627,6 +635,12 @@ def booking_form(default_date: date | None = None, form_key: str = "booking_form
 
             date_str = booking_date.isoformat()
             time_str = booking_time.strftime("%H:%M")
+
+            # Проверка что запись не выходит за 18:00
+            hour = booking_time.hour
+            if hour + duration // 60 > 18 or (hour + duration // 60 == 18 and booking_time.minute + duration % 60 > 0):
+                st.error(f"Запись на {booking_time_str} длительностью {duration} мин выходит за пределы рабочего дня (до 18:00).")
+                return
 
             try:
                 if not check_availability(date_str, time_str, duration):
