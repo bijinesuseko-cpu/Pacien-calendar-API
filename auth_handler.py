@@ -49,13 +49,9 @@ def _try_login() -> bool:
         return False
 
     # ── OAuth callback ──
-    params = st.query_params
-    if "code" in params:
-        code = params["code"]
-        del params["code"]
-        if "state" in params:
-            del params["state"]
-        st.query_params = params
+    code = st.query_params.get("code")
+    if code and st.session_state.get("_last_code") != code:
+        st.session_state["_last_code"] = code
 
         body = urllib.parse.urlencode({
             "code": code,
