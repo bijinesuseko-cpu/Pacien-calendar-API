@@ -579,7 +579,11 @@ def edit_event_form():
 
         with col2:
             booking_date = st.date_input("Дата", value=date.fromisoformat(ev["date"]))
-            booking_time = st.time_input("Время", value=datetime.strptime(ev["time"], "%H:%M").time())
+            time_options = [f"{h:02d}:{m:02d}" for h in range(11, 19) for m in (0, 30)]
+            ev_time = ev["time"]
+            time_idx = time_options.index(ev_time) if ev_time in time_options else 0
+            booking_time_str = st.selectbox("Время", time_options, index=time_idx)
+            booking_time = datetime.strptime(booking_time_str, "%H:%M").time()
             duration = st.selectbox("Длительность", [30, 60, 90, 120], index=[30, 60, 90, 120].index(ev.get("duration", 60)))
 
         notes = st.text_area("Заметка", value=ev.get("notes", ""), height=80)

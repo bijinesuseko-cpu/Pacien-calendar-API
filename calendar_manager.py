@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from auth_handler import get_credentials
@@ -142,7 +142,7 @@ def create_event(client_name: str, phone: str, service_name: str, date_str: str,
     if not check_availability(date_str, time_str, duration_minutes):
         raise ValueError(f"Слот {date_str} в {time_str} уже занят.")
 
-    dt_start = datetime.fromisoformat(f"{date_str}T{time_str}:00")
+    dt_start = datetime.fromisoformat(f"{date_str}T{time_str}:00").replace(tzinfo=timezone.utc)
     dt_end = dt_start + timedelta(minutes=duration_minutes)
 
     summary = f"{EVENT_PREFIX}{client_name}"
@@ -175,7 +175,7 @@ def create_event(client_name: str, phone: str, service_name: str, date_str: str,
 
 
 def update_event(event_id: str, client_name: str, phone: str, service_name: str, date_str: str, time_str: str, duration_minutes: int = 60, notes: str = "", attendance: str = "") -> dict:
-    dt_start = datetime.fromisoformat(f"{date_str}T{time_str}:00")
+    dt_start = datetime.fromisoformat(f"{date_str}T{time_str}:00").replace(tzinfo=timezone.utc)
     dt_end = dt_start + timedelta(minutes=duration_minutes)
 
     summary = f"{EVENT_PREFIX}{client_name}"
