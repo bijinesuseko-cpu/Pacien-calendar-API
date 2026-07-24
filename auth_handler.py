@@ -79,10 +79,10 @@ def _popup_login() -> bool:
     """Check for OAuth callback in URL params, or show login button."""
     client_id = st.secrets["google"]["client_id"]
     client_secret = st.secrets["google"]["client_secret"]
-    redirect_uri = st.secrets["google"].get(
-        "redirect_uri",
-        st.get_option("server.baseUrlPath") or f"https://{st.get_option('server.appUrl')}",
-    )
+    redirect_uri = st.secrets["google"].get("redirect_uri")
+    if not redirect_uri:
+        st.error("Настройте redirect_uri в secrets (например, https://pacien-calendar-api-0.streamlit.app)")
+        return False
 
     # ── Check OAuth callback ──
     params = st.query_params
