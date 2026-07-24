@@ -266,13 +266,16 @@ def login_section() -> bool:
         return True
     else:
         st.sidebar.warning("Не авторизован")
-        if _is_cloud():
-            return _popup_login()
-        else:
+        # Если есть credentials.json — используем локальный OAuth
+        if os.path.exists(CREDENTIALS_FILE):
             if st.sidebar.button("Войти через Google", use_container_width=True):
                 creds = get_credentials()
                 if creds:
                     st.rerun()
                 else:
                     st.sidebar.error("Ошибка входа")
+        elif _is_cloud():
+            return _popup_login()
+        else:
+            st.sidebar.error("Нет конфигурации авторизации.")
         return False
