@@ -545,7 +545,7 @@ def render_calendar_view(events: list[dict]):
         # ── Кнопка добавления на выбранный день ──
         st.divider()
         with st.popover("+ Записать на этот день", use_container_width=True):
-            booking_form(default_date=selected_d, form_key="booking_form_cal")
+            booking_form(default_date=selected_d, form_key="booking_form_cal", booked_slots=day_events)
 
 
 def edit_event_form():
@@ -602,7 +602,7 @@ def edit_event_form():
                 st.error(str(e))
 
 
-def booking_form(default_date: date | None = None, form_key: str = "booking_form"):
+def booking_form(default_date: date | None = None, form_key: str = "booking_form", booked_slots: list[dict] | None = None):
     with st.form(form_key, clear_on_submit=True):
         st.markdown("### Новая запись")
 
@@ -617,13 +617,34 @@ def booking_form(default_date: date | None = None, form_key: str = "booking_form
             booking_date = st.date_input("Дата", value=default_date or date.today())
             # С 11:00 до 18:30 с шагом 30 мин
             time_options = [f"{h:02d}:{m:02d}" for h in range(11, 19) for m in (0, 30)]
-            time_idx = 0  # 11:00
+
+            # Фильтруем занятые слоты
+            if booked_slots and default_date:
+                def _is_free(t: str, dur: int = 60) -> bool:
+                    cand_start = datetime.strptime(f"{default_date.isoformat()} {t}", "%Y-%m-%d %H:%M")
+                    cand_end = cand_start + timedelta(minutes=dur)
+                    for b in booked_slots:
+                        b_start = datetime.strptime(f"{default_date.isoformat()} {b['time']}", "%Y-%m-%d %H:%M")
+                        b_end = b_start + timedelta(minutes=b["duration"])
+                        if cand_start < b_end and cand_end > b_start:
+                            return False
+                    return True
+                time_options = [t for t in time_options if _is_free(t, 60)]
+
+            time_idx = 0
             now = datetime.now()
             default_time = f"{now.hour:02d}:{now.minute // 30 * 30:02d}"
             if default_time in time_options:
                 time_idx = time_options.index(default_time)
-            booking_time_str = st.selectbox("Время", time_options, index=time_idx)
-            booking_time = datetime.strptime(booking_time_str, "%H:%M").time()
+            elif time_options:
+                time_idx = 0
+            booking_time_str = st.selectbox("Время", time_options, index=time_idx) if time_options else st.empty()
+            if time_options:
+                booking_time = datetime.strptime(booking_time_str, "%H:%M").time()
+            else:
+                st.warning("На этот день нет свободных слотов.")
+                st.form_submit_button("Записать", use_container_width=True, type="primary", disabled=True)
+                return
             duration = st.selectbox("Длительность", [30, 60, 90, 120], index=1)
 
         notes = st.text_area("Заметка", placeholder="Дополнительная информация...", height=80)
