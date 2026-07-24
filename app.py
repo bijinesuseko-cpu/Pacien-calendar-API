@@ -350,15 +350,27 @@ def render_table_view(events: list[dict]):
             with c4:
                 st.markdown(attendance_badge(ev.get("attendance", "")), unsafe_allow_html=True)
             with c5:
-                if st.button("✏️", key=f"edit_tab_{ev['id']}", help="Изменить"):
-                    st.session_state["editing_event"] = ev
-                    st.rerun()
-                if st.button("🗑️", key=f"del_tab_{ev['id']}", help="Удалить"):
-                    try:
-                        delete_event(ev["id"])
+                b1, b2 = st.columns(2)
+                with b1:
+                    if st.button("✅", key=f"arr_tab_{ev['id']}", help="Пришёл"):
+                        set_attendance(ev["id"], "arrived")
                         st.rerun()
-                    except RuntimeError as e:
-                        st.error(str(e))
+                with b2:
+                    if st.button("❌", key=f"miss_tab_{ev['id']}", help="Не пришёл"):
+                        set_attendance(ev["id"], "missed")
+                        st.rerun()
+                b3, b4 = st.columns(2)
+                with b3:
+                    if st.button("✏️", key=f"edit_tab_{ev['id']}", help="Изменить"):
+                        st.session_state["editing_event"] = ev
+                        st.rerun()
+                with b4:
+                    if st.button("🗑️", key=f"del_tab_{ev['id']}", help="Удалить"):
+                        try:
+                            delete_event(ev["id"])
+                            st.rerun()
+                        except RuntimeError as e:
+                            st.error(str(e))
         st.divider()
 
 
