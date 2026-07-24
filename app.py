@@ -542,6 +542,11 @@ def render_calendar_view(events: list[dict]):
         else:
             st.info("Нет записей на этот день")
 
+        # ── Кнопка добавления на выбранный день ──
+        st.divider()
+        with st.popover("+ Записать на этот день", use_container_width=True):
+            booking_form(default_date=selected_d, form_key="booking_form_cal")
+
 
 def edit_event_form():
     ev = st.session_state.get("editing_event")
