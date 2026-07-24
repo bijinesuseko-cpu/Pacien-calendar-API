@@ -185,6 +185,31 @@ CUSTOM_CSS = """
     .att-arrived { background: var(--success-subtle); color: var(--success); }
     .att-missed { background: var(--danger-subtle); color: var(--danger); }
     .att-pending { background: var(--accent-subtle); color: var(--accent); }
+
+    /* ─── Action buttons (table/today compact icon buttons) ─── */
+    .stButton > button[kind="secondaryFormSubmit"],
+    .stButton > button:not([kind="primary"]):not([kind="secondary"]):not([kind="primaryFormSubmit"]) {
+        min-width: 30px !important;
+        height: 30px !important;
+        padding: 0 2px !important;
+        font-size: 0.75rem !important;
+        border-radius: 6px !important;
+        background: transparent !important;
+        border: 1px solid var(--border) !important;
+        color: var(--text-secondary) !important;
+        transition: all 0.15s ease !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    .stButton > button:not([kind="primary"]):not([kind="secondary"]):not([kind="primaryFormSubmit"]):hover {
+        transform: scale(1.15) !important;
+        background: var(--bg-hover) !important;
+        border-color: var(--text-muted) !important;
+        color: var(--text-primary) !important;
+    }
+    /* Color hints by button text */
+    .stButton > button:not([kind]):hover { }
 </style>
 """
 
