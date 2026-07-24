@@ -7,7 +7,7 @@ import warnings
 import streamlit as st
 import streamlit.components.v1 as components
 
-warnings.filterwarnings("ignore", message="Please replace `st.components.v1.html`")
+warnings.filterwarnings("ignore", message=".*st\\.components\\.v1\\.html.*")
 
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
