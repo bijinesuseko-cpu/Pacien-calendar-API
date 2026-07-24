@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
-from auth_handler import get_credentials, login_button, logout, is_authenticated
+from auth_handler import get_credentials, revoke_token, is_authenticated, login_section
 from calendar_manager import fetch_events, create_event, update_event, delete_event, set_attendance, check_availability
 
 WEEKDAY_NAMES = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
@@ -208,18 +208,6 @@ def attendance_badge(status: str) -> str:
 def attendance_icon(status: str) -> str:
     return {"arrived": "✅", "missed": "❌"}.get(status, "⏳")
 
-
-def login_section():
-    if is_authenticated():
-        st.sidebar.success("✓ Авторизован")
-        if st.sidebar.button("Выйти", use_container_width=True):
-            logout()
-            st.rerun()
-        return True
-    else:
-        st.sidebar.warning("Не авторизован")
-        login_button()
-        return False
 
 
 def render_today_view(events: list[dict]):
