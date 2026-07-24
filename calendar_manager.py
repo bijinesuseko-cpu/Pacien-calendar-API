@@ -142,7 +142,7 @@ def create_event(client_name: str, phone: str, service_name: str, date_str: str,
     if not check_availability(date_str, time_str, duration_minutes):
         raise ValueError(f"Слот {date_str} в {time_str} уже занят.")
 
-    dt_start = datetime.fromisoformat(f"{date_str}T{time_str}:00").replace(tzinfo=timezone.utc)
+    dt_start = datetime.fromisoformat(f"{date_str}T{time_str}:00").replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=5)))
     dt_end = dt_start + timedelta(minutes=duration_minutes)
 
     summary = f"{EVENT_PREFIX}{client_name}"
@@ -155,11 +155,11 @@ def create_event(client_name: str, phone: str, service_name: str, date_str: str,
         "description": description,
         "start": {
             "dateTime": dt_start.isoformat(),
-            "timeZone": "UTC",
+            "timeZone": "Asia/Yekaterinburg",
         },
         "end": {
             "dateTime": dt_end.isoformat(),
-            "timeZone": "UTC",
+            "timeZone": "Asia/Yekaterinburg",
         },
     }
 
@@ -175,7 +175,7 @@ def create_event(client_name: str, phone: str, service_name: str, date_str: str,
 
 
 def update_event(event_id: str, client_name: str, phone: str, service_name: str, date_str: str, time_str: str, duration_minutes: int = 60, notes: str = "", attendance: str = "") -> dict:
-    dt_start = datetime.fromisoformat(f"{date_str}T{time_str}:00").replace(tzinfo=timezone.utc)
+    dt_start = datetime.fromisoformat(f"{date_str}T{time_str}:00").replace(tzinfo=timezone.utc).astimezone(timezone(timedelta(hours=5)))
     dt_end = dt_start + timedelta(minutes=duration_minutes)
 
     summary = f"{EVENT_PREFIX}{client_name}"
@@ -190,11 +190,11 @@ def update_event(event_id: str, client_name: str, phone: str, service_name: str,
         "description": description,
         "start": {
             "dateTime": dt_start.isoformat(),
-            "timeZone": "UTC",
+            "timeZone": "Asia/Yekaterinburg",
         },
         "end": {
             "dateTime": dt_end.isoformat(),
-            "timeZone": "UTC",
+            "timeZone": "Asia/Yekaterinburg",
         },
     }
 
