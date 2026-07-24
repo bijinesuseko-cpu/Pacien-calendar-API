@@ -542,9 +542,6 @@ def render_calendar_view(events: list[dict]):
         else:
             st.info("Нет записей на этот день")
 
-        st.divider()
-        booking_form(default_date=selected_d, form_key="booking_form_cal")
-
 
 def edit_event_form():
     ev = st.session_state.get("editing_event")
@@ -679,6 +676,10 @@ def main():
 
     st.sidebar.divider()
 
+    # ── Кнопка добавления записи ──
+    with st.sidebar.popover("+ Новая запись", use_container_width=True):
+        booking_form()
+
     events = []
     try:
         now = datetime.utcnow()
@@ -689,7 +690,7 @@ def main():
         st.error(f"Ошибка загрузки событий: {e}")
         st.stop()
 
-    st.sidebar.metric("Записей", len(events))
+    st.sidebar.divider()
 
     if "editing_event" in st.session_state:
         edit_event_form()
@@ -702,11 +703,6 @@ def main():
             render_table_view(events)
         else:
             render_calendar_view(events)
-
-        # Default form — не показывать в календаре, там своя форма при выборе дня
-        if view_mode != "Календарь":
-            st.divider()
-            booking_form()
 
 
 if __name__ == "__main__":
