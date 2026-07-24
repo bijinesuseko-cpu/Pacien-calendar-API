@@ -5,7 +5,6 @@ import urllib.parse
 import urllib.request
 import warnings
 import streamlit as st
-import streamlit.components.v1 as components
 
 warnings.filterwarnings("ignore", message=".*st\\.components\\.v1\\.html.*")
 
@@ -74,86 +73,35 @@ def _local_login() -> bool:
         return False
 
 
-# ─── Cloud OAuth (st.secrets → popup) ─────────────────────
+# ─── Cloud OAuth (st.secrets → redirect) ──────────────────
 
 def _popup_login() -> bool:
+    """Check for OAuth callback in URL params, or show login button."""
     client_id = st.secrets["google"]["client_id"]
     client_secret = st.secrets["google"]["client_secret"]
     redirect_uri = st.secrets["google"].get(
         "redirect_uri",
-        f"{st.get_option('server.baseUrlPath')}/component/streamlit_oauth.authorize_button",
+        st.get_option("server.baseUrlPath") or f"https://{st.get_option('server.appUrl')}",
     )
 
-    state = st.session_state.get("_oauth_state", "")
-    if not state:
-        state = secrets.token_urlsafe(32)
-        st.session_state["_oauth_state"] = state
+    # ── Check OAuth callback ──
+    params = st.query_params
+    if "code" in params and "state" in params:
+        code = params["code"]
+        state = params["state"]
+        expected_state = st.session_state.get("_oauth_state", "")
 
-    params = {
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "response_type": "code",
-        "scope": " ".join(SCOPES),
-        "state": state,
-        "access_type": "offline",
-        "prompt": "consent",
-    }
-    auth_url = AUTHORIZE_ENDPOINT + "?" + urllib.parse.urlencode(params)
+        # Clear params so they don't trigger again
+        del params["code"]
+        del params["state"]
+        st.query_params = params
 
-    result = components.html(
-        f"""
-        <div style="display:flex;justify-content:center;align-items:center;height:100%;">
-            <button id="google-btn"
-                    style="background:#dc2626;color:#fff;border:none;border-radius:8px;
-                           padding:10px 32px;font-size:15px;font-weight:600;
-                           font-family:'Inter',-apple-system,sans-serif;cursor:pointer;
-                           box-shadow:0 2px 6px rgba(220,38,38,0.35);
-                           display:inline-flex;align-items:center;gap:10px;outline:none;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="8" r="4"/>
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                </svg>
-                Войти через Google
-            </button>
-        </div>
-        <script>
-            document.getElementById('google-btn').onclick = function() {{
-                var w = 600, h = 600;
-                var left = Math.round((screen.width - w) / 2);
-                var top = Math.round((screen.height - h) / 2);
-                var popup = window.open(
-                    '{auth_url}',
-                    'oauth',
-                    'toolbar=no,location=no,status=no,menubar=no,width=' + w + ',height=' + h + ',top=' + top + ',left=' + left
-                );
-                if (!popup) return;
-                var poll = setInterval(function() {{
-                    try {{
-                        var url = popup.location.href;
-                        if (url && url.startsWith('{redirect_uri}')) {{
-                            clearInterval(poll);
-                            var data = {{}};
-                            for (var entry of new URL(url).searchParams.entries()) {{
-                                data[entry[0]] = entry[1];
-                            }}
-                            Streamlit.setComponentValue(data);
-                            setTimeout(function() {{ popup.close(); }}, 100);
-                        }}
-                    }} catch(e) {{}}
-                }}, 500);
-            }};
-        </script>
-        """,
-        height=56,
-    )
-
-    if result and isinstance(result, dict) and "code" in result:
-        if result.get("state") != state:
+        if state != expected_state:
             st.error("Ошибка: несовпадение state. Попробуйте снова.")
             return False
 
         body = urllib.parse.urlencode({
-            "code": result["code"],
+            "code": code,
             "client_id": client_id,
             "client_secret": client_secret,
             "redirect_uri": redirect_uri,
@@ -170,7 +118,43 @@ def _popup_login() -> bool:
             return True
         except urllib.error.URLError as e:
             st.error(f"Ошибка обмена кода на токен: {e}")
+            return False
 
+    # ── Show login button ──
+    state = secrets.token_urlsafe(32)
+    st.session_state["_oauth_state"] = state
+
+    params = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": " ".join(SCOPES),
+        "state": state,
+        "access_type": "offline",
+        "prompt": "consent",
+    }
+    auth_url = AUTHORIZE_ENDPOINT + "?" + urllib.parse.urlencode(params)
+
+    st.markdown(
+        f"""
+        <div style="display:flex;justify-content:center;padding:1rem 0;">
+            <a href="{auth_url}"
+               style="background:#dc2626;color:#fff;border:none;border-radius:8px;
+                      padding:10px 32px;font-size:15px;font-weight:600;
+                      font-family:Inter,-apple-system,sans-serif;cursor:pointer;
+                      text-decoration:none;display:inline-flex;align-items:center;gap:10px;
+                      box-shadow:0 2px 6px rgba(220,38,38,0.35);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="8" r="4"/>
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                </svg>
+                Войти через Google
+            </a>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     return False
 
 
