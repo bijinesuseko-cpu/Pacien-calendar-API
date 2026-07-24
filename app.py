@@ -335,7 +335,7 @@ def render_table_view(events: list[dict]):
 
     for ev in filtered:
         with st.container(border=False):
-            c1, c2, c3, c4 = st.columns([2, 2, 3, 2])
+            c1, c2, c3, c4, c5 = st.columns([2, 2, 2, 1.5, 1.5])
             with c1:
                 st.markdown(f"**{ev['date']}** {ev['time']}")
                 st.caption(f"{ev['duration']} мин")
@@ -349,6 +349,16 @@ def render_table_view(events: list[dict]):
                     st.caption(f"📝 {ev['notes']}")
             with c4:
                 st.markdown(attendance_badge(ev.get("attendance", "")), unsafe_allow_html=True)
+            with c5:
+                if st.button("✏️", key=f"edit_tab_{ev['id']}", help="Изменить"):
+                    st.session_state["editing_event"] = ev
+                    st.rerun()
+                if st.button("🗑️", key=f"del_tab_{ev['id']}", help="Удалить"):
+                    try:
+                        delete_event(ev["id"])
+                        st.rerun()
+                    except RuntimeError as e:
+                        st.error(str(e))
         st.divider()
 
 
