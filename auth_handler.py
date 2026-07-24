@@ -49,15 +49,16 @@ def _try_login() -> bool:
         return False
 
     # ── OAuth callback ──
+    code = None
     try:
-        params = st.query_params
-        code = params.get("code")
+        raw = st.query_params.get("code")
+        code = raw[0] if isinstance(raw, list) else raw
     except Exception:
         try:
-            params = st.experimental_get_query_params()
-            code = params.get("code", [None])[0]
+            raw = st.experimental_get_query_params().get("code", [None])
+            code = raw[0] if isinstance(raw, list) else raw
         except Exception:
-            code = None
+            pass
     if code and st.session_state.get("_last_code") != code:
         st.session_state["_last_code"] = code
 
