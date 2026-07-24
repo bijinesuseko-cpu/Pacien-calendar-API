@@ -210,6 +210,20 @@ CUSTOM_CSS = """
     }
     /* Color hints by button text */
     .stButton > button:not([kind]):hover { }
+    /* ─── Mobile (≤768px) ─── */
+    @media (max-width: 768px) {
+        .block-container { max-width: 100% !important; padding: 0.5rem !important; }
+        section[data-testid="stSidebar"] { width: 100% !important; min-width: 100% !important; }
+        h1 { font-size: 1.3rem !important; }
+        h2 { font-size: 1.1rem !important; }
+        h3 { font-size: 1rem !important; }
+        .stButton > button { font-size: 0.8rem !important; padding: 0.4rem 0.8rem !important; }
+        .att-badge { font-size: 0.7rem !important; padding: 1px 6px !important; }
+    }
+    @media (max-width: 480px) {
+        section[data-testid="stSidebar"] > div:first-child { padding: 10px 8px !important; }
+        .stMarkdown p { font-size: 0.8rem !important; }
+    }
 </style>
 """
 
