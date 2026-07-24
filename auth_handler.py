@@ -3,34 +3,15 @@ import json
 import secrets
 import urllib.parse
 import urllib.request
-import warnings
 import streamlit as st
-
-warnings.filterwarnings("ignore", message=".*st\\.components\\.v1\\.html.*")
 
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
-
 AUTHORIZE_ENDPOINT = "https://accounts.google.com/o/oauth2/auth"
 TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
-
-CREDENTIALS_FILE = "credentials.json"
 TOKEN_FILE = "token.json"
-
-
-# ─── Environment ──────────────────────────────────────────
-
-def _is_local() -> bool:
-    return os.path.exists(CREDENTIALS_FILE)
-
-
-def _is_cloud() -> bool:
-    try:
-        return "google" in st.secrets
-    except Exception:
-        return False
 
 
 # ─── Token persistence ────────────────────────────────────
@@ -51,45 +32,26 @@ def _load_token() -> dict | None:
         return None
 
 
-# ─── Local OAuth (credentials.json → run_local_server) ────
+# ─── OAuth (st.secrets → redirect) ────────────────────────
 
-def _local_login() -> bool:
-    from google_auth_oauthlib.flow import InstalledAppFlow
-
-    if not os.path.exists(CREDENTIALS_FILE):
-        return False
-
-    try:
-        flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_FILE, SCOPES)
-        creds = flow.run_local_server(port=0)
-        st.session_state["token"] = {
-            "access_token": creds.token,
-            "refresh_token": creds.refresh_token,
-        }
-        _save_token(st.session_state["token"])
-        return True
-    except Exception as e:
-        st.error(f"Ошибка авторизации: {e}")
-        return False
-
-
-# ─── Cloud OAuth (st.secrets → redirect) ──────────────────
-
-def _popup_login() -> bool:
+def _try_login() -> bool:
     """Check for OAuth callback in URL params, or show login button."""
-    client_id = st.secrets["google"]["client_id"]
-    client_secret = st.secrets["google"]["client_secret"]
-    redirect_uri = st.secrets["google"].get("redirect_uri")
-    if not redirect_uri:
-        st.error("Настройте redirect_uri в secrets (например, https://pacien-calendar-api-0.streamlit.app)")
+    try:
+        client_id = st.secrets["google"]["client_id"]
+        client_secret = st.secrets["google"]["client_secret"]
+        redirect_uri = st.secrets["google"].get("redirect_uri")
+    except Exception:
+        st.error("Настройте google client_id и client_secret в Secrets.")
         return False
 
-    # ── Check OAuth callback ──
+    if not redirect_uri:
+        st.error("Добавьте redirect_uri в Secrets (например https://ваше-приложение.streamlit.app)")
+        return False
+
+    # ── OAuth callback ──
     params = st.query_params
     if "code" in params:
         code = params["code"]
-
-        # Clear params so they don't trigger again
         del params["code"]
         if "state" in params:
             del params["state"]
@@ -115,11 +77,11 @@ def _popup_login() -> bool:
             st.error(f"Ошибка обмена кода на токен: {e}")
             return False
 
-    # ── Show login button ──
+    # ── Login button ──
     state = secrets.token_urlsafe(32)
     st.session_state["_oauth_state"] = state
 
-    params = {
+    auth_url = AUTHORIZE_ENDPOINT + "?" + urllib.parse.urlencode({
         "client_id": client_id,
         "redirect_uri": redirect_uri,
         "response_type": "code",
@@ -127,8 +89,7 @@ def _popup_login() -> bool:
         "state": state,
         "access_type": "offline",
         "prompt": "consent",
-    }
-    auth_url = AUTHORIZE_ENDPOINT + "?" + urllib.parse.urlencode(params)
+    })
 
     st.markdown(
         f"""
@@ -153,63 +114,41 @@ def _popup_login() -> bool:
     return False
 
 
-# ─── Public API ───────────────────────────────────────────
-
 def get_credentials() -> Credentials | None:
-    """Return valid Google Credentials. Runs auth flow if needed."""
-    # Try restoring from saved token
     token = st.session_state.get("token") or _load_token()
     if token:
         st.session_state["token"] = token
 
     if "token" in st.session_state:
         token = st.session_state["token"]
-        client_id = client_secret = token_uri = None
+        try:
+            cid = st.secrets["google"]["client_id"]
+            csecret = st.secrets["google"]["client_secret"]
+        except Exception:
+            return None
 
-        if _is_local():
-            with open(CREDENTIALS_FILE) as f:
-                cfg = json.load(f)["installed"]
-            client_id, client_secret = cfg["client_id"], cfg["client_secret"]
-            token_uri = cfg["token_uri"]
-        elif _is_cloud():
-            client_id = st.secrets["google"]["client_id"]
-            client_secret = st.secrets["google"]["client_secret"]
-            token_uri = TOKEN_ENDPOINT
-
-        if client_id:
-            creds = Credentials(
-                token=token.get("access_token"),
-                refresh_token=token.get("refresh_token"),
-                token_uri=token_uri,
-                client_id=client_id,
-                client_secret=client_secret,
-                scopes=SCOPES,
-            )
-            if creds.valid:
+        creds = Credentials(
+            token=token.get("access_token"),
+            refresh_token=token.get("refresh_token"),
+            token_uri=TOKEN_ENDPOINT,
+            client_id=cid,
+            client_secret=csecret,
+            scopes=SCOPES,
+        )
+        if creds.valid:
+            return creds
+        if creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+                st.session_state["token"] = {
+                    "access_token": creds.token,
+                    "refresh_token": creds.refresh_token,
+                }
+                _save_token(st.session_state["token"])
                 return creds
-            if creds.expired and creds.refresh_token:
-                try:
-                    creds.refresh(Request())
-                    st.session_state["token"] = {
-                        "access_token": creds.token,
-                        "refresh_token": creds.refresh_token,
-                    }
-                    _save_token(st.session_state["token"])
-                    return creds
-                except Exception:
-                    del st.session_state["token"]
-                    return None
-
-    # No valid token → run auth flow
-    if _is_local():
-        if _local_login():
-            return get_credentials()
-    elif _is_cloud():
-        st.warning("Нажмите «Войти через Google» для авторизации.")
-        return None
-    else:
-        st.error("Нет конфигурации: поместите credentials.json или настройте secrets.")
-        return None
+            except Exception:
+                del st.session_state["token"]
+                return None
 
     return None
 
@@ -234,8 +173,6 @@ def is_authenticated() -> bool:
     return "token" in st.session_state
 
 
-# ─── UI helpers ───────────────────────────────────────────
-
 def login_section() -> bool:
     if is_authenticated():
         st.sidebar.success("✓ Авторизован через Google")
@@ -245,16 +182,4 @@ def login_section() -> bool:
         return True
     else:
         st.sidebar.warning("Не авторизован")
-        # Если есть credentials.json — используем локальный OAuth
-        if os.path.exists(CREDENTIALS_FILE):
-            if st.sidebar.button("Войти через Google", use_container_width=True):
-                creds = get_credentials()
-                if creds:
-                    st.rerun()
-                else:
-                    st.sidebar.error("Ошибка входа")
-        elif _is_cloud():
-            return _popup_login()
-        else:
-            st.sidebar.error("Нет конфигурации авторизации.")
-        return False
+        return _try_login()
