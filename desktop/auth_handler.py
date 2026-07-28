@@ -39,7 +39,12 @@ def _delete_token():
 
 def login() -> bool:
     if not CLIENT_ID or not CLIENT_SECRET:
+        print("❌ GOOGLE_CLIENT_ID или GOOGLE_CLIENT_SECRET не заданы")
         return False
+
+    print("🔄 Запуск локального сервера на порту 8080...")
+    print("   Браузер откроется для входа через Google")
+    print("   Если этого не произошло — вручную разрешите http://localhost:8080")
 
     flow = InstalledAppFlow.from_client_config(
         {
@@ -54,25 +59,35 @@ def login() -> bool:
     )
 
     try:
-        creds = flow.run_local_server(port=8080, open_browser=True)
+        creds = flow.run_local_server(port=8080, open_browser=True, timeout=120)
+        print("✅ Токен получен! Сохраняем...")
         _save_token({
             "access_token": creds.token,
             "refresh_token": creds.refresh_token,
             "expiry": creds.expiry.isoformat() if creds.expiry else None,
         })
         return True
-    except Exception:
+    except Exception as e:
+        print(f"❌ Ошибка получения токена: {e}")
         return False
 
 
 def get_credentials() -> Credentials | None:
     token = _load_token()
     if not token:
+        print("  → токена нет в файле")
         return None
 
     try:
         expiry_str = token.get("expiry")
         expiry = datetime.fromisoformat(expiry_str) if expiry_str else None
+        now = datetime.now(timezone.utc)
+
+        print(f"  → токен: access_token={token.get('access_token','')[:20]}...")
+        print(f"  → срок: {expiry_str}")
+        print(f"  → сейчас: {now.isoformat()}")
+        if expiry:
+            print(f"  → протух: {expiry < now}")
 
         creds = Credentials(
             token=token.get("access_token"),
@@ -85,21 +100,27 @@ def get_credentials() -> Credentials | None:
         )
 
         if creds.expired and creds.refresh_token:
+            print("  ⚠️ токен протух, пробуем обновить...")
             try:
                 creds.refresh(Request())
+                print("  ✅ токен обновлён")
                 _save_token({
                     "access_token": creds.token,
                     "refresh_token": creds.refresh_token,
                 })
                 return creds
-            except Exception:
+            except Exception as e:
+                print(f"  ❌ ошибка обновления: {e}")
                 _delete_token()
                 return None
 
         if creds.valid:
+            print("  ✅ токен валиден")
             return creds
-    except Exception:
-        pass
+
+        print("  ❌ токен невалиден и не может быть обновлён")
+    except Exception as e:
+        print(f"  ❌ ошибка в get_credentials: {e}")
 
     return None
 
