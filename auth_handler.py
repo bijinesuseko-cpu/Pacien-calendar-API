@@ -120,10 +120,6 @@ def _try_login() -> bool:
 
 
 def get_credentials() -> Credentials | None:
-    token = st.session_state.get("token") or _load_token()
-    if token:
-        st.session_state["token"] = token
-
     if "token" in st.session_state:
         token = st.session_state["token"]
         try:
@@ -171,10 +167,6 @@ def revoke_token() -> bool:
 
 
 def is_authenticated() -> bool:
-    if "token" not in st.session_state:
-        saved = _load_token()
-        if saved:
-            st.session_state["token"] = saved
     return "token" in st.session_state
 
 
