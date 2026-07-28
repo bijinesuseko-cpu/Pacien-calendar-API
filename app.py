@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
-from auth_handler import get_credentials, revoke_token, is_authenticated, login_section
+from auth_handler import get_credentials, revoke_token, is_authenticated, login_section, exchange_code, build_google_auth_url
 from calendar_manager import fetch_events, create_event, update_event, delete_event, set_attendance, check_availability
 
 WEEKDAY_NAMES = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
@@ -737,15 +737,41 @@ def main():
     st.set_page_config(page_title="Календарь записей", page_icon="📅", layout="wide")
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
+    # ── OAuth callback ──
+    code = None
+    try:
+        raw = st.query_params.get("code")
+        code = raw[0] if isinstance(raw, list) else raw
+    except Exception:
+        try:
+            raw = st.experimental_get_query_params().get("code", [None])
+            code = raw[0] if isinstance(raw, list) else raw
+        except Exception:
+            pass
+
+    if code:
+        try:
+            exchange_code(code)
+            st.rerun()
+        except RuntimeError as e:
+            st.error(str(e))
+        st.stop()
+
     authenticated = login_section()
 
     if not authenticated:
+        try:
+            redirect_uri = st.secrets["google"]["redirect_uri"]
+            auth_url = build_google_auth_url(redirect_uri)
+        except Exception:
+            auth_url = "/"
+
         st.markdown(
             "<div style='text-align:center; padding:4rem 2rem;'>"
             "<div style='font-size:3rem; margin-bottom:1rem;'>📅</div>"
             "<h2 style='color:var(--text-primary);'>Календарь записей</h2>"
             "<p style='color:var(--text-secondary);'>Войдите через Google для доступа к записям</p>"
-            "<a href='/login' target='_self' style='"
+            f"<a href='{auth_url}' target='_self' style='"
             "display:inline-block;background:#dc2626;color:#fff;border:none;border-radius:8px;"
             "padding:10px 32px;font-size:15px;font-weight:600;text-decoration:none;"
             "box-shadow:0 2px 6px rgba(220,38,38,0.35);margin-top:1rem;'>"

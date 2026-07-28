@@ -44,19 +44,22 @@ def build_google_auth_url(redirect_uri: str) -> str:
     })
 
 
-def handle_oauth_callback(code: str, redirect_uri: str) -> bool:
-    print("=== handle_oauth_callback() ===")
+def exchange_code(code: str) -> None:
+    print("=== exchange_code() ===")
     try:
         client_id = st.secrets["google"]["client_id"]
         client_secret = st.secrets["google"]["client_secret"]
+        redirect_uri = st.secrets["google"]["redirect_uri"]
         print(f"  client_id={client_id}")
+        print(f"  redirect_uri={redirect_uri}")
     except Exception:
-        print("  ❌ secrets google не найдены")
-        return False
+        raise RuntimeError("Настройте google client_id, client_secret и redirect_uri в Secrets.")
 
     if st.session_state.get("_last_code") == code:
         print("  ℹ️ code уже обработан")
-        return True
+        if "token" in st.session_state:
+            return
+        raise RuntimeError("Сессия потеряна. Войдите снова.")
 
     print("  🔄 обмен code на токен...")
     body = urllib.parse.urlencode({
@@ -77,10 +80,9 @@ def handle_oauth_callback(code: str, redirect_uri: str) -> bool:
         st.session_state["_last_code"] = code
         st.session_state["token"] = token_data
         _save_token(token_data)
-        return True
     except urllib.error.URLError as e:
         print(f"  ❌ ошибка обмена: {e}")
-        return False
+        raise RuntimeError(f"Ошибка обмена кода на токен: {e}")
 
 
 def get_credentials() -> Credentials | None:
@@ -158,13 +160,18 @@ def login_section() -> bool:
         return True
     else:
         st.sidebar.warning("Не авторизован")
-        st.sidebar.markdown(
-            "<a href='/login' target='_self' style='"
-            "display:block;background:#dc2626;color:#fff;border-radius:8px;"
-            "padding:8px 16px;font-size:14px;font-weight:600;"
-            "text-decoration:none;text-align:center;"
-            "box-shadow:0 2px 6px rgba(220,38,38,0.35);'>"
-            "Войти через Google</a>",
-            unsafe_allow_html=True,
-        )
+        try:
+            redirect_uri = st.secrets["google"]["redirect_uri"]
+            auth_url = build_google_auth_url(redirect_uri)
+            st.sidebar.markdown(
+                f"<a href='{auth_url}' target='_self' style='"
+                "display:block;background:#dc2626;color:#fff;border-radius:8px;"
+                "padding:8px 16px;font-size:14px;font-weight:600;"
+                "text-decoration:none;text-align:center;"
+                "box-shadow:0 2px 6px rgba(220,38,38,0.35);'>"
+                "Войти через Google</a>",
+                unsafe_allow_html=True,
+            )
+        except Exception:
+            pass
         return False
