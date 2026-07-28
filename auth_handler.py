@@ -99,19 +99,19 @@ def _try_login() -> bool:
     st.markdown(
         f"""
         <div style="display:flex;justify-content:center;padding:1rem 0;">
-            <div onclick="window.location.href='{auth_url}'"
-                 style="background:#dc2626;color:#fff;border:none;border-radius:8px;
-                        padding:10px 32px;font-size:15px;font-weight:600;
-                        font-family:Inter,-apple-system,sans-serif;cursor:pointer;
-                        display:inline-flex;align-items:center;gap:10px;
-                        box-shadow:0 2px 6px rgba(220,38,38,0.35);">
+            <a href="{auth_url}" target="_self"
+               style="background:#dc2626;color:#fff;border:none;border-radius:8px;
+                      padding:10px 32px;font-size:15px;font-weight:600;
+                      font-family:Inter,-apple-system,sans-serif;cursor:pointer;
+                      text-decoration:none;display:inline-flex;align-items:center;gap:10px;
+                      box-shadow:0 2px 6px rgba(220,38,38,0.35);">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"
                      stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="8" r="4"/>
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                 </svg>
                 Войти через Google
-            </div>
+            </a>
         </div>
         """,
         unsafe_allow_html=True,
