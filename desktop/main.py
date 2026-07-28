@@ -516,7 +516,8 @@ class CalendarApp:
             title=ft.Text("✏️ Редактировать" if is_edit else "➕ Новая запись"),
             content=ft.Column([
                 name, phone, service,
-                ft.Row([date_picker, time_picker, duration]),
+                ft.Row([date_picker, time_picker]),
+                duration,
                 notes,
             ], width=500, height=350, scroll=ft.ScrollMode.AUTO),
             actions=[
@@ -533,8 +534,7 @@ class CalendarApp:
 
     def _close_dialog(self, dialog):
         dialog.open = False
-        if dialog in self.page.overlay:
-            self.page.overlay.remove(dialog)
+        self.page.overlay.clear()
         self.page.update()
 
     def _save_booking(self, dialog, ev, name, phone, service, date_picker, time_picker, duration, notes, is_edit):
