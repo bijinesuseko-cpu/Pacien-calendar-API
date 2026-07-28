@@ -78,17 +78,51 @@ def get_credentials() -> Credentials | None:
         return None
 
     try:
-        expiry_str = token.get("expiry")
-        expiry = datetime.fromisoformat(expiry_str) if expiry_str else None
-        if expiry and expiry.tzinfo is None:
-            expiry = expiry.replace(tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
+        expiry_str = token.get("expiry")
+
+        if expiry_str:
+            expiry = datetime.fromisoformat(expiry_str)
+            if expiry.tzinfo is None:
+                expiry = expiry.replace(tzinfo=timezone.utc)
+        else:
+            expiry = None
 
         print(f"  → токен: access_token={token.get('access_token','')[:20]}...")
         print(f"  → срок: {expiry}")
         print(f"  → сейчас: {now.isoformat()}")
-        if expiry:
-            print(f"  → протух: {expiry < now}")
+
+        # Если протух — пробуем обновить ДО создания Credentials
+        if expiry and expiry < now:
+            print("  ⚠️ токен протух")
+            refresh_token = token.get("refresh_token")
+            if refresh_token:
+                print("  🔄 пробуем обновить...")
+                temp_creds = Credentials(
+                    token=None,
+                    refresh_token=refresh_token,
+                    token_uri="https://oauth2.googleapis.com/token",
+                    client_id=CLIENT_ID,
+                    client_secret=CLIENT_SECRET,
+                    scopes=SCOPES,
+                )
+                try:
+                    temp_creds.refresh(Request())
+                    print("  ✅ токен обновлён")
+                    _save_token({
+                        "access_token": temp_creds.token,
+                        "refresh_token": temp_creds.refresh_token,
+                        "expiry": temp_creds.expiry.isoformat() if temp_creds.expiry else None,
+                    })
+                    return temp_creds
+                except Exception as e:
+                    print(f"  ❌ ошибка обновления: {e}")
+                    _delete_token()
+                    return None
+            else:
+                print("  ❌ нет refresh_token")
+                _delete_token()
+                return None
 
         creds = Credentials(
             token=token.get("access_token"),
@@ -97,30 +131,10 @@ def get_credentials() -> Credentials | None:
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
             scopes=SCOPES,
-            expiry=expiry,
         )
 
-        if creds.expired and creds.refresh_token:
-            print("  ⚠️ токен протух, пробуем обновить...")
-            try:
-                creds.refresh(Request())
-                print("  ✅ токен обновлён")
-                _save_token({
-                    "access_token": creds.token,
-                    "refresh_token": creds.refresh_token,
-                    "expiry": creds.expiry.isoformat() if creds.expiry else None,
-                })
-                return creds
-            except Exception as e:
-                print(f"  ❌ ошибка обновления: {e}")
-                _delete_token()
-                return None
-
-        if creds.valid:
-            print("  ✅ токен валиден")
-            return creds
-
-        print("  ❌ токен невалиден и не может быть обновлён")
+        print("  ✅ токен валиден")
+        return creds
     except Exception as e:
         print(f"  ❌ ошибка в get_credentials: {e}")
 
