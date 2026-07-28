@@ -35,20 +35,23 @@ def _load_token() -> dict | None:
 # ─── OAuth (st.secrets → redirect) ────────────────────────
 
 def _try_login() -> bool:
-    """Check for OAuth callback in URL params, or show login button."""
+    print("=== _try_login() ===")
     try:
         client_id = st.secrets["google"]["client_id"]
         client_secret = st.secrets["google"]["client_secret"]
         redirect_uri = st.secrets["google"].get("redirect_uri")
+        print(f"  client_id={client_id}")
+        print(f"  redirect_uri={redirect_uri}")
     except Exception:
+        print("  ❌ secrets google не найдены")
         st.error("Настройте google client_id и client_secret в Secrets.")
         return False
 
     if not redirect_uri:
-        st.error("Добавьте redirect_uri в Secrets (например https://ваше-приложение.streamlit.app)")
+        print("  ❌ redirect_uri пустой")
+        st.error("Добавьте redirect_uri в Secrets")
         return False
 
-    # ── OAuth callback ──
     code = None
     try:
         raw = st.query_params.get("code")
@@ -59,8 +62,13 @@ def _try_login() -> bool:
             code = raw[0] if isinstance(raw, list) else raw
         except Exception:
             pass
+
+    if code:
+        print(f"  🔑 code найден в URL: {code[:20]}...")
+
     if code and st.session_state.get("_last_code") != code:
         st.session_state["_last_code"] = code
+        print("  🔄 обмен code на токен...")
 
         body = urllib.parse.urlencode({
             "code": code,
@@ -75,12 +83,18 @@ def _try_login() -> bool:
         try:
             resp = urllib.request.urlopen(req)
             token_data = json.loads(resp.read().decode())
+            print(f"  ✅ токен получен, access_token={token_data.get('access_token', '')[:30]}...")
+            print(f"     есть refresh_token: {'да' if token_data.get('refresh_token') else 'нет'}")
             st.session_state["token"] = token_data
             _save_token(token_data)
             return True
         except urllib.error.URLError as e:
+            print(f"  ❌ ошибка обмена: {e}")
+            print(f"     status={e.code if hasattr(e, 'code') else 'N/A'}")
             st.error(f"Ошибка обмена кода на токен: {e}")
             return False
+
+    print("  ℹ️ code не найден/уже обработан — показываем кнопку входа")
 
     # ── Login button ──
     state = secrets.token_urlsafe(32)
@@ -120,12 +134,15 @@ def _try_login() -> bool:
 
 
 def get_credentials() -> Credentials | None:
+    print("=== get_credentials() ===")
     if "token" in st.session_state:
+        print("  ✅ токен есть в session_state")
         token = st.session_state["token"]
         try:
             cid = st.secrets["google"]["client_id"]
             csecret = st.secrets["google"]["client_secret"]
         except Exception:
+            print("  ❌ secrets не найдены")
             return None
 
         creds = Credentials(
@@ -137,8 +154,10 @@ def get_credentials() -> Credentials | None:
             scopes=SCOPES,
         )
         if creds.valid:
+            print("  ✅ токен валиден")
             return creds
         if creds.expired and creds.refresh_token:
+            print("  🔄 токен истёк, refreshing...")
             try:
                 creds.refresh(Request())
                 st.session_state["token"] = {
@@ -146,28 +165,38 @@ def get_credentials() -> Credentials | None:
                     "refresh_token": creds.refresh_token,
                 }
                 _save_token(st.session_state["token"])
+                print("  ✅ refresh успешен")
                 return creds
-            except Exception:
+            except Exception as e:
+                print(f"  ❌ refresh failed: {e}")
                 del st.session_state["token"]
                 return None
-
+        print("  ❌ токен невалиден и не может быть обновлён")
+    else:
+        print("  ❌ токена нет в session_state")
     return None
 
 
 def revoke_token() -> bool:
+    print("=== revoke_token() ===")
     if "token" in st.session_state:
         del st.session_state["token"]
+        print("  🗑️ токен удалён из session_state")
     if os.path.exists(TOKEN_FILE):
         try:
             os.remove(TOKEN_FILE)
+            print("  🗑️ token.json удалён")
             return True
         except OSError:
             pass
+    print("  ℹ️ token.json не найден")
     return False
 
 
 def is_authenticated() -> bool:
-    return "token" in st.session_state
+    result = "token" in st.session_state
+    print(f"=== is_authenticated() → {result} ===")
+    return result
 
 
 def login_section() -> bool:
