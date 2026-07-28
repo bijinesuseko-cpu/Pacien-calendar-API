@@ -151,6 +151,47 @@ def is_authenticated() -> bool:
     return result
 
 
+GOOGLE_BTN_STYLE = (
+    "display:inline-flex;align-items:center;gap:10px;"
+    "background:#dc2626;color:#fff;border:none;border-radius:8px;"
+    "padding:10px 32px;font-size:15px;font-weight:600;"
+    "font-family:Inter,-apple-system,sans-serif;cursor:pointer;"
+    "box-shadow:0 2px 6px rgba(220,38,38,0.35);"
+)
+
+
+def _popup_html(auth_url: str) -> str:
+    return f"""
+<div style="display:flex;justify-content:center;padding:1rem 0;">
+    <button id="google-login" onclick="
+        (function() {{
+            var popup = window.open('{auth_url}', 'oauth-popup', 'width=500,height=700,left=400,top=200');
+            if (!popup) {{ alert('Разрешите всплывающие окна для этого сайта'); return; }}
+            var poll = setInterval(function() {{
+                try {{
+                    if (popup.closed) {{ clearInterval(poll); return; }}
+                    if (popup.location.href.indexOf('code=') !== -1) {{
+                        clearInterval(poll);
+                        window.parent.location.href = popup.location.href;
+                    }}
+                }} catch(e) {{}}
+            }}, 300);
+        }})();
+    " style="{GOOGLE_BTN_STYLE}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="8" r="4"/>
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        </svg>
+        Войти через Google
+    </button>
+</div>"""
+
+
+def render_login_button(auth_url: str) -> None:
+    st.markdown(_popup_html(auth_url), unsafe_allow_html=True)
+
+
 def login_section() -> bool:
     if is_authenticated():
         st.sidebar.success("✓ Авторизован через Google")
@@ -163,15 +204,27 @@ def login_section() -> bool:
         try:
             redirect_uri = st.secrets["google"]["redirect_uri"]
             auth_url = build_google_auth_url(redirect_uri)
-            st.sidebar.markdown(
-                f"<a href='{auth_url}' target='_self' style='"
-                "display:block;background:#dc2626;color:#fff;border-radius:8px;"
-                "padding:8px 16px;font-size:14px;font-weight:600;"
-                "text-decoration:none;text-align:center;"
-                "box-shadow:0 2px 6px rgba(220,38,38,0.35);'>"
-                "Войти через Google</a>",
-                unsafe_allow_html=True,
-            )
+            sidebar_btn = f"""
+            <button onclick="
+                (function() {{
+                    var p = window.open('{auth_url}', 'oauth-popup', 'width=500,height=700');
+                    if (!p) {{ return; }}
+                    var t = setInterval(function() {{
+                        try {{
+                            if (p.closed) {{ clearInterval(t); return; }}
+                            if (p.location.href.indexOf('code=') !== -1) {{
+                                clearInterval(t);
+                                window.parent.location.href = p.location.href;
+                            }}
+                        }} catch(e) {{}}
+                    }}, 300);
+                }})();
+            " style="display:block;width:100%;background:#dc2626;color:#fff;border-radius:8px;
+                padding:8px 16px;font-size:14px;font-weight:600;border:none;cursor:pointer;
+                box-shadow:0 2px 6px rgba(220,38,38,0.35);font-family:Inter,-apple-system,sans-serif;">
+                Войти через Google
+            </button>"""
+            st.sidebar.markdown(sidebar_btn, unsafe_allow_html=True)
         except Exception:
             pass
         return False

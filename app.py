@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime, date, timedelta
-from auth_handler import get_credentials, revoke_token, is_authenticated, login_section, exchange_code, build_google_auth_url
+from auth_handler import get_credentials, revoke_token, is_authenticated, login_section, exchange_code, build_google_auth_url, render_login_button
 from calendar_manager import fetch_events, create_event, update_event, delete_event, set_attendance, check_availability
 
 WEEKDAY_NAMES = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
@@ -771,14 +771,10 @@ def main():
             "<div style='font-size:3rem; margin-bottom:1rem;'>📅</div>"
             "<h2 style='color:var(--text-primary);'>Календарь записей</h2>"
             "<p style='color:var(--text-secondary);'>Войдите через Google для доступа к записям</p>"
-            f"<a href='{auth_url}' target='_self' style='"
-            "display:inline-block;background:#dc2626;color:#fff;border:none;border-radius:8px;"
-            "padding:10px 32px;font-size:15px;font-weight:600;text-decoration:none;"
-            "box-shadow:0 2px 6px rgba(220,38,38,0.35);margin-top:1rem;'>"
-            "Войти через Google</a>"
             "</div>",
             unsafe_allow_html=True,
         )
+        render_login_button(auth_url)
         st.stop()
 
     st.sidebar.divider()
