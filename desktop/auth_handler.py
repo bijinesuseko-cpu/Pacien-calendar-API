@@ -1,12 +1,11 @@
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 
-# Перед .exe сборкой: заменить на вшитые значения
 CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
@@ -59,7 +58,7 @@ def login() -> bool:
         _save_token({
             "access_token": creds.token,
             "refresh_token": creds.refresh_token,
-            "expires_at": creds.expiry.timestamp() if creds.expiry else None,
+            "expiry": creds.expiry.isoformat() if creds.expiry else None,
         })
         return True
     except Exception:
@@ -72,6 +71,9 @@ def get_credentials() -> Credentials | None:
         return None
 
     try:
+        expiry_str = token.get("expiry")
+        expiry = datetime.fromisoformat(expiry_str) if expiry_str else None
+
         creds = Credentials(
             token=token.get("access_token"),
             refresh_token=token.get("refresh_token"),
@@ -79,10 +81,10 @@ def get_credentials() -> Credentials | None:
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
             scopes=SCOPES,
+            expiry=expiry,
         )
 
-        expires_at = token.get("expires_at")
-        if expires_at and expires_at < datetime.now().timestamp() and creds.refresh_token:
+        if creds.expired and creds.refresh_token:
             try:
                 creds.refresh(Request())
                 _save_token({
