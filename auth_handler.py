@@ -158,4 +158,13 @@ def login_section() -> bool:
         return True
     else:
         st.sidebar.warning("Не авторизован")
+        st.sidebar.markdown(
+            "<a href='/login' target='_self' style='"
+            "display:block;background:#dc2626;color:#fff;border-radius:8px;"
+            "padding:8px 16px;font-size:14px;font-weight:600;"
+            "text-decoration:none;text-align:center;"
+            "box-shadow:0 2px 6px rgba(220,38,38,0.35);'>"
+            "Войти через Google</a>",
+            unsafe_allow_html=True,
+        )
         return False

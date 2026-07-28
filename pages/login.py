@@ -12,7 +12,7 @@ if not LOGIN_PAGE_URL:
 # Если уже авторизован — редирект на главную
 if is_authenticated():
     st.markdown(
-        "<meta http-equiv='refresh' content='0; url=./'>",
+        "<meta http-equiv='refresh' content='0; url=/'>",
         unsafe_allow_html=True,
     )
     st.success("✓ Уже авторизован. Перенаправление...")
@@ -33,13 +33,14 @@ except Exception:
 if code:
     success = handle_oauth_callback(code, LOGIN_PAGE_URL)
     if success:
+        st.query_params.clear()
         st.markdown(
-            "<meta http-equiv='refresh' content='1; url=./'>",
+            "<meta http-equiv='refresh' content='0; url=/'>",
             unsafe_allow_html=True,
         )
         st.success("✅ Вход выполнен! Перенаправление...")
     else:
-        st.error("❌ Ошибка входа. Попробуйте снова.")
+        st.error("❌ Ошибка обмена кода на токен. Проверьте логи сервера.")
     st.stop()
 
 # ── Кнопка логина ──
