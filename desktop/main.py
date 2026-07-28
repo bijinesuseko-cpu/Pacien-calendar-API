@@ -40,6 +40,7 @@ class CalendarApp:
         self._cal_month = date.today().month
         self._cal_year = date.today().year
         self._edit_event: dict | None = None
+        self._cal_selected_date: date | None = None
         self._clients = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
 
         self._check_auth()
@@ -348,6 +349,10 @@ class CalendarApp:
 
     # ── Calendar view ───────────────────────────────────────
 
+    def _on_cal_day_click(self, d: date):
+        self._cal_selected_date = d
+        self._refresh_client_list()
+
     def _build_calendar_view(self) -> ft.Column:
         today = date.today()
         first_day = date(self._cal_year, self._cal_month, 1)
@@ -371,7 +376,6 @@ class CalendarApp:
             ft.IconButton(ft.Icons.ARROW_FORWARD, on_click=self._cal_next),
         ], alignment=ft.MainAxisAlignment.CENTER)
 
-        # Header
         header = ft.Row(
             [ft.Container(content=ft.Text(d, size=12, weight=ft.FontWeight.W_600,
                                           color=ft.Colors.GREY_400),
@@ -390,6 +394,7 @@ class CalendarApp:
                     d = date(self._cal_year, self._cal_month, day_num)
                     ds = d.isoformat()
                     is_today = d == today
+                    is_selected = self._cal_selected_date == d
                     day_events = events_by_date.get(ds, [])
 
                     dots = ""
@@ -398,16 +403,19 @@ class CalendarApp:
                     if len(day_events) > 3:
                         dots += f"\n+{len(day_events) - 3}"
 
-                    color = ft.Colors.BLUE_300 if is_today else ft.Colors.GREY_100
+                    bg = ft.Colors.BLUE_900 if is_selected else ft.Colors.GREY_800
+                    color = ft.Colors.BLUE_300 if is_today or is_selected else ft.Colors.GREY_100
                     row_cells.append(ft.Container(
                         content=ft.Column([
-                            ft.Text(str(day_num), size=14, weight=ft.FontWeight.BOLD,
-                                    color=color),
+                            ft.Text(str(day_num), size=14, weight=ft.FontWeight.BOLD, color=color),
                             ft.Text(dots, size=9, color=ft.Colors.GREY_400),
                         ]),
                         expand=True, height=80,
-                        border=ft.border.all(0.5, ft.Colors.GREY_700),
+                        border=ft.border.all(1, ft.Colors.BLUE_700 if is_selected else ft.Colors.GREY_700),
+                        border_radius=4 if is_selected else 0,
+                        bgcolor=bg,
                         padding=3,
+                        on_click=lambda _, dd=d: self._on_cal_day_click(dd),
                     ))
                 else:
                     row_cells.append(ft.Container(expand=True, height=80,
@@ -415,10 +423,39 @@ class CalendarApp:
 
             weeks.append(ft.Row(row_cells))
 
-        return ft.Column([
+        parts = [
             ft.Text("📅 Календарь", size=22, weight=ft.FontWeight.BOLD),
             nav, header, *weeks,
-        ], scroll=ft.ScrollMode.AUTO)
+        ]
+
+        # ── Selected day section ──
+        sd = self._cal_selected_date
+        if sd and sd.month == self._cal_month:
+            parts.append(ft.Divider(height=10))
+            parts.append(ft.Text(
+                f"{sd.day} {MONTH_NAMES[sd.month]} {sd.year} — {WEEKDAY_NAMES[sd.weekday()]}",
+                size=16, weight=ft.FontWeight.W_600,
+            ))
+
+            day_events = sorted(
+                [e for e in self._events if e["date"] == sd.isoformat()],
+                key=lambda e: e["time"],
+            )
+
+            if day_events:
+                for ev in day_events:
+                    parts.append(self._build_event_card(ev, "cal"))
+            else:
+                parts.append(ft.Text("Нет записей на этот день", color=ft.Colors.GREY_400, size=14))
+
+            parts.append(
+                ft.ElevatedButton(
+                    "➕ Записать на этот день",
+                    on_click=lambda _: self._open_booking_dialog(sd),
+                )
+            )
+
+        return ft.Column(parts, scroll=ft.ScrollMode.AUTO)
 
     def _cal_prev(self, e):
         if self._cal_month == 1:
@@ -426,6 +463,7 @@ class CalendarApp:
             self._cal_year -= 1
         else:
             self._cal_month -= 1
+        self._cal_selected_date = None
         self._refresh_client_list()
 
     def _cal_next(self, e):
@@ -434,12 +472,13 @@ class CalendarApp:
             self._cal_year += 1
         else:
             self._cal_month += 1
+        self._cal_selected_date = None
         self._refresh_client_list()
 
     # ── Add / Edit dialogs ──────────────────────────────────
 
     def _show_add_dialog(self, e=None):
-        default_date = date.today()
+        default_date = self._cal_selected_date or date.today()
         self._open_booking_dialog(default_date)
 
     def _show_edit_dialog(self, ev: dict):
