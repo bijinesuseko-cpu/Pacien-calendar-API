@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 from datetime import datetime, date, timedelta
 from auth_handler import get_credentials, revoke_token, is_authenticated, login_section
 from calendar_manager import fetch_events, create_event, update_event, delete_event, set_attendance, check_availability
