@@ -93,7 +93,7 @@ def _try_login() -> bool:
         "scope": " ".join(SCOPES),
         "state": state,
         "access_type": "offline",
-        "prompt": "consent",
+        "prompt": "select_account",
     })
 
     st.markdown(
