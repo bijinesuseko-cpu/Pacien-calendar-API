@@ -42,9 +42,8 @@ def login() -> bool:
         print("❌ GOOGLE_CLIENT_ID или GOOGLE_CLIENT_SECRET не заданы")
         return False
 
-    print("🔄 Запуск локального сервера на порту 8080...")
+    print("🔄 Запуск локального сервера для OAuth...")
     print("   Браузер откроется для входа через Google")
-    print("   Если этого не произошло — вручную разрешите http://localhost:8080")
 
     flow = InstalledAppFlow.from_client_config(
         {
@@ -59,7 +58,7 @@ def login() -> bool:
     )
 
     try:
-        creds = flow.run_local_server(port=8080, open_browser=True, timeout=120)
+        creds = flow.run_local_server(port=0, open_browser=True, timeout=120)
         print("✅ Токен получен! Сохраняем...")
         _save_token({
             "access_token": creds.token,
@@ -81,10 +80,12 @@ def get_credentials() -> Credentials | None:
     try:
         expiry_str = token.get("expiry")
         expiry = datetime.fromisoformat(expiry_str) if expiry_str else None
+        if expiry and expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
         now = datetime.now(timezone.utc)
 
         print(f"  → токен: access_token={token.get('access_token','')[:20]}...")
-        print(f"  → срок: {expiry_str}")
+        print(f"  → срок: {expiry}")
         print(f"  → сейчас: {now.isoformat()}")
         if expiry:
             print(f"  → протух: {expiry < now}")
@@ -107,6 +108,7 @@ def get_credentials() -> Credentials | None:
                 _save_token({
                     "access_token": creds.token,
                     "refresh_token": creds.refresh_token,
+                    "expiry": creds.expiry.isoformat() if creds.expiry else None,
                 })
                 return creds
             except Exception as e:
