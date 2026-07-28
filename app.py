@@ -750,12 +750,12 @@ def main():
             pass
 
     if code:
-        try:
-            exchange_code(code)
-            st.rerun()
-        except RuntimeError as e:
-            st.error(str(e))
-        st.stop()
+        already_done = st.session_state.get("_last_code") == code and "token" in st.session_state
+        if not already_done:
+            try:
+                exchange_code(code)
+            except RuntimeError as e:
+                st.error(str(e))
 
     authenticated = login_section()
 
