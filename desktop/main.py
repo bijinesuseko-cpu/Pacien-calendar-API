@@ -167,6 +167,7 @@ class CalendarApp:
 
     def _on_logout(self, e):
         auth_handler.logout()
+        self._events = []
         self._show_login()
 
     # ── Event helpers ───────────────────────────────────────
@@ -522,7 +523,8 @@ class CalendarApp:
             self._show_dialog_error(str(ex))
 
     def _show_dialog_error(self, msg: str):
-        pass  # упрощённо
+        self.page.snack_bar = ft.SnackBar(content=ft.Text(msg), open=True)
+        self.page.update()
 
     # ── Run ─────────────────────────────────────────────────
 

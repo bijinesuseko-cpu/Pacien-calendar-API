@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from auth_handler import get_credentials  # noqa: E402
+from auth_handler import get_credentials
 
 
 SERVICE_NAME = "calendar"
@@ -18,30 +18,42 @@ def get_service():
     return build(SERVICE_NAME, API_VERSION, credentials=creds)
 
 
+def _handle_http_error(e: HttpError):
+    if e.resp.status == 401:
+        raise RuntimeError(TOKEN_EXPIRED)
+    if e.resp.status == 400:
+        body = e.content.decode("utf-8", errors="replace") if e.content else "no body"
+        print(f"  ⚠️ Google API 400: {body}")
+        raise RuntimeError(f"Bad Request (400): {body}")
+    if e.resp.status == 429:
+        raise RuntimeError("Превышен лимит запросов Google API. Попробуйте позже.")
+    if e.resp.status in (403, 404):
+        raise RuntimeError("Нет доступа к календарю. Обратитесь к администратору.")
+    raise RuntimeError(f"Ошибка Google API: {e}")
+
+
+def _utcnow_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 def fetch_events(time_min: datetime | None = None, time_max: datetime | None = None) -> list[dict]:
     service = get_service()
-    now = datetime.utcnow().isoformat() + "Z"
+    now = _utcnow_iso()
 
     params = {
         "calendarId": CALENDAR_ID,
-        "timeMin": time_min.isoformat() + "Z" if time_min else now,
+        "timeMin": time_min.isoformat().replace("+00:00", "Z") + "Z" if time_min else now,
         "maxResults": 250,
         "singleEvents": True,
         "orderBy": "startTime",
     }
     if time_max:
-        params["timeMax"] = time_max.isoformat() + "Z"
+        params["timeMax"] = time_max.isoformat().replace("+00:00", "Z") + "Z"
 
     try:
         events_result = service.events().list(**params).execute()
     except HttpError as e:
-        if e.resp.status == 400:
-            raise RuntimeError(TOKEN_EXPIRED)
-        if e.resp.status == 429:
-            raise RuntimeError("Превышен лимит запросов Google API. Попробуйте позже.")
-        if e.resp.status in (403, 404):
-            raise RuntimeError("Нет доступа к календарю. Обратитесь к администратору.")
-        raise RuntimeError(f"Ошибка Google API: {e}")
+        _handle_http_error(e)
 
     items = events_result.get("items", [])
     return [_parse_event(e) for e in items]
@@ -88,8 +100,6 @@ def _parse_event(event: dict) -> dict:
     if title.startswith(EVENT_PREFIX):
         client_name = title[len(EVENT_PREFIX):]
 
-    status = event.get("status", "confirmed")
-
     return {
         "id": event.get("id"),
         "client_name": client_name,
@@ -100,7 +110,7 @@ def _parse_event(event: dict) -> dict:
         "phone": phone,
         "notes": notes,
         "attendance": attendance,
-        "status": status,
+        "status": event.get("status", "confirmed"),
         "summary": title,
     }
 
@@ -119,13 +129,7 @@ def check_availability(date_str: str, time_str: str, duration_minutes: int = 60)
             maxResults=50,
         ).execute()
     except HttpError as e:
-        if e.resp.status == 400:
-            raise RuntimeError(TOKEN_EXPIRED)
-        if e.resp.status == 429:
-            raise RuntimeError("Превышен лимит запросов Google API. Попробуйте позже.")
-        if e.resp.status in (403, 404):
-            raise RuntimeError("Нет доступа к календарю. Обратитесь к администратору.")
-        raise RuntimeError(f"Ошибка Google API: {e}")
+        _handle_http_error(e)
 
     events = events_result.get("items", [])
     for ev in events:
@@ -147,7 +151,7 @@ def create_event(client_name: str, phone: str, service_name: str, date_str: str,
     if not check_availability(date_str, time_str, duration_minutes):
         raise ValueError(f"Слот {date_str} в {time_str} уже занят.")
 
-    dt_start = datetime.fromisoformat(f"{date_str}T{time_str}:00").replace(tzinfo=timezone(timedelta(hours=5)))
+    dt_start = datetime.fromisoformat(f"{date_str}T{time_str}:00")
     dt_end = dt_start + timedelta(minutes=duration_minutes)
 
     summary = f"{EVENT_PREFIX}{client_name}"
@@ -172,17 +176,13 @@ def create_event(client_name: str, phone: str, service_name: str, date_str: str,
     try:
         created = service.events().insert(calendarId=CALENDAR_ID, body=event_body).execute()
     except HttpError as e:
-        if e.resp.status == 400:
-            raise RuntimeError(TOKEN_EXPIRED)
-        if e.resp.status == 429:
-            raise RuntimeError("Превышен лимит запросов Google API. Попробуйте позже.")
-        raise RuntimeError(f"Не удалось создать событие: {e}")
+        _handle_http_error(e)
 
     return _parse_event(created)
 
 
 def update_event(event_id: str, client_name: str, phone: str, service_name: str, date_str: str, time_str: str, duration_minutes: int = 60, notes: str = "", attendance: str = "") -> dict:
-    dt_start = datetime.fromisoformat(f"{date_str}T{time_str}:00").replace(tzinfo=timezone(timedelta(hours=5)))
+    dt_start = datetime.fromisoformat(f"{date_str}T{time_str}:00")
     dt_end = dt_start + timedelta(minutes=duration_minutes)
 
     summary = f"{EVENT_PREFIX}{client_name}"
@@ -209,11 +209,7 @@ def update_event(event_id: str, client_name: str, phone: str, service_name: str,
     try:
         updated = service.events().update(calendarId=CALENDAR_ID, eventId=event_id, body=event_body).execute()
     except HttpError as e:
-        if e.resp.status == 400:
-            raise RuntimeError(TOKEN_EXPIRED)
-        if e.resp.status == 429:
-            raise RuntimeError("Превышен лимит запросов Google API. Попробуйте позже.")
-        raise RuntimeError(f"Не удалось обновить событие: {e}")
+        _handle_http_error(e)
 
     return _parse_event(updated)
 
@@ -223,11 +219,7 @@ def delete_event(event_id: str) -> None:
     try:
         service.events().delete(calendarId=CALENDAR_ID, eventId=event_id).execute()
     except HttpError as e:
-        if e.resp.status == 400:
-            raise RuntimeError(TOKEN_EXPIRED)
-        if e.resp.status == 429:
-            raise RuntimeError("Превышен лимит запросов Google API. Попробуйте позже.")
-        raise RuntimeError(f"Не удалось удалить событие: {e}")
+        _handle_http_error(e)
 
 
 def set_attendance(event_id: str, attendance: str) -> dict:
@@ -235,9 +227,7 @@ def set_attendance(event_id: str, attendance: str) -> dict:
     try:
         event = service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
     except HttpError as e:
-        if e.resp.status == 400:
-            raise RuntimeError(TOKEN_EXPIRED)
-        raise RuntimeError(f"Не удалось получить событие: {e}")
+        _handle_http_error(e)
 
     description = event.get("description", "")
     lines = description.split("\n")
@@ -257,8 +247,6 @@ def set_attendance(event_id: str, attendance: str) -> dict:
     try:
         updated = service.events().update(calendarId=CALENDAR_ID, eventId=event_id, body=event).execute()
     except HttpError as e:
-        if e.resp.status == 400:
-            raise RuntimeError(TOKEN_EXPIRED)
-        raise RuntimeError(f"Не удалось обновить событие: {e}")
+        _handle_http_error(e)
 
     return _parse_event(updated)
