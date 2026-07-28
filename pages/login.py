@@ -11,11 +11,12 @@ if not LOGIN_PAGE_URL:
 
 # Если уже авторизован — редирект на главную
 if is_authenticated():
+    st.success("✓ Уже авторизован")
     st.markdown(
         "<meta http-equiv='refresh' content='0; url=/'>",
         unsafe_allow_html=True,
     )
-    st.success("✓ Уже авторизован. Перенаправление...")
+    st.button("Перейти в приложение", on_click=lambda: st.switch_page("app.py"))
     st.stop()
 
 # ── OAuth callback ──
@@ -31,17 +32,29 @@ except Exception:
         pass
 
 if code:
+    st.info(f"🔄 Обработка кода авторизации...")
     success = handle_oauth_callback(code, LOGIN_PAGE_URL)
     if success:
-        st.query_params.clear()
+        st.success("✅ Вход выполнен!")
         st.markdown(
-            "<meta http-equiv='refresh' content='0; url=/'>",
+            "<meta http-equiv='refresh' content='1; url=/'>",
             unsafe_allow_html=True,
         )
-        st.success("✅ Вход выполнен! Перенаправление...")
+        st.button("Перейти в приложение", on_click=lambda: st.switch_page("app.py"))
     else:
-        st.error("❌ Ошибка обмена кода на токен. Проверьте логи сервера.")
+        st.error("❌ Ошибка обмена кода на токен. Попробуйте снова.")
+        st.markdown(
+            "<a href='/login' target='_self' "
+            "style='display:inline-block;background:#dc2626;color:#fff;"
+            "padding:8px 20px;border-radius:8px;text-decoration:none;"
+            "font-weight:600;'>Повторить вход</a>",
+            unsafe_allow_html=True,
+        )
     st.stop()
+
+# ── Debug info ──
+if st.query_params:
+    st.caption(f"Query params: {dict(st.query_params)}")
 
 # ── Кнопка логина ──
 st.markdown(
