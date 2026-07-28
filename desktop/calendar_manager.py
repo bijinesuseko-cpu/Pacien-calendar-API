@@ -42,13 +42,13 @@ def fetch_events(time_min: datetime | None = None, time_max: datetime | None = N
 
     params = {
         "calendarId": CALENDAR_ID,
-        "timeMin": time_min.isoformat().replace("+00:00", "Z") + "Z" if time_min else now,
+        "timeMin": time_min.isoformat().replace("+00:00", "Z") if time_min else now,
         "maxResults": 250,
         "singleEvents": True,
         "orderBy": "startTime",
     }
     if time_max:
-        params["timeMax"] = time_max.isoformat().replace("+00:00", "Z") + "Z"
+        params["timeMax"] = time_max.isoformat().replace("+00:00", "Z")
 
     try:
         events_result = service.events().list(**params).execute()
