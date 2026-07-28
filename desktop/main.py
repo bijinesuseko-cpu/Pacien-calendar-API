@@ -1,7 +1,7 @@
 import os
 import sys
 import threading
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 
 import flet as ft
 
@@ -42,18 +42,7 @@ class CalendarApp:
         self._edit_event: dict | None = None
         self._clients = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
 
-        self._setup_ui()
         self._check_auth()
-
-    def _setup_ui(self):
-        self.page.theme = ft.Theme(
-            color_scheme=ft.ColorScheme(
-                primary=ft.colors.BLUE_400,
-                surface=ft.colors.GREY_900,
-                on_surface=ft.colors.GREY_100,
-                secondary=ft.colors.GREY_700,
-            )
-        )
 
     def _check_auth(self):
         if auth_handler.is_authenticated():
@@ -67,19 +56,19 @@ class CalendarApp:
 
         def on_login(e):
             status_text.value = "🔄 Открываем браузер..."
-            status_text.color = ft.colors.ORANGE_300
+            status_text.color = ft.Colors.ORANGE_300
             self.page.update()
 
             def _do_login():
                 success = auth_handler.login()
                 if success:
                     status_text.value = "✅ Успешно! Загружаем данные..."
-                    status_text.color = ft.colors.GREEN_400
+                    status_text.color = ft.Colors.GREEN_400
                     self.page.update()
                     self._load_and_show()
                 else:
                     status_text.value = "❌ Ошибка входа. Попробуйте снова."
-                    status_text.color = ft.colors.RED_400
+                    status_text.color = ft.Colors.RED_400
                     self.page.update()
 
             threading.Thread(target=_do_login, daemon=True).start()
@@ -105,7 +94,7 @@ class CalendarApp:
 
         def _fetch():
             try:
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 past = now - timedelta(days=7)
                 future = now + timedelta(days=90)
                 self._events = fetch_events(time_min=past, time_max=future)
@@ -124,21 +113,22 @@ class CalendarApp:
                     selected_index=0,
                     label_type=ft.NavigationRailLabelType.ALL,
                     destinations=[
-                        ft.NavigationRailDestination(icon=ft.icons.TODAY, label="Сегодня"),
-                        ft.NavigationRailDestination(icon=ft.icons.DATE_RANGE, label="Неделя"),
-                        ft.NavigationRailDestination(icon=ft.icons.TABLE_CHART, label="Таблица"),
-                        ft.NavigationRailDestination(icon=ft.icons.CALENDAR_MONTH, label="Календарь"),
+                        ft.NavigationRailDestination(icon=ft.Icons.TODAY, label="Сегодня"),
+                        ft.NavigationRailDestination(icon=ft.Icons.DATE_RANGE, label="Неделя"),
+                        ft.NavigationRailDestination(icon=ft.Icons.TABLE_CHART, label="Таблица"),
+                        ft.NavigationRailDestination(icon=ft.Icons.CALENDAR_MONTH, label="Календарь"),
                     ],
                     on_change=self._on_nav_change,
+                    expand=True,
                 ),
                 ft.Divider(height=10),
                 ft.ElevatedButton("+ Новая запись", on_click=self._show_add_dialog),
                 ft.Divider(height=10),
                 ft.ElevatedButton("Выйти", on_click=self._on_logout),
-            ]),
+            ], expand=True),
             padding=10,
             width=200,
-            bgcolor=ft.colors.GREY_900,
+            bgcolor=ft.Colors.GREY_900,
         )
 
         self._main_content = ft.Container(content=ft.Text("Загрузка..."), padding=20, expand=True)
@@ -171,7 +161,7 @@ class CalendarApp:
 
     def _show_error(self, msg: str):
         self._main_content.content = ft.Column([
-            ft.Text(f"❌ {msg}", color=ft.colors.RED_400, size=16),
+            ft.Text(f"❌ {msg}", color=ft.Colors.RED_400, size=16),
         ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
         self.page.update()
 
@@ -207,31 +197,31 @@ class CalendarApp:
             content=ft.Column([
                 ft.Row([
                     ft.Text(f"{att_icon} {ev['time']}", weight=ft.FontWeight.BOLD, size=16),
-                    ft.Text(f"{ev['duration']} мин", size=12, color=ft.colors.GREY_400),
+                    ft.Text(f"{ev['duration']} мин", size=12, color=ft.Colors.GREY_400),
                     ft.Row([
-                        ft.IconButton(ft.icons.CHECK_CIRCLE_OUTLINE, tooltip="Пришёл",
-                                      icon_color=ft.colors.GREEN_400,
+                        ft.IconButton(ft.Icons.CHECK_CIRCLE_OUTLINE, tooltip="Пришёл",
+                                      icon_color=ft.Colors.GREEN_400,
                                       on_click=lambda _, eid=ev["id"]: self._mark_attendance(eid, "arrived")),
-                        ft.IconButton(ft.icons.CANCEL_OUTLINED, tooltip="Не пришёл",
-                                      icon_color=ft.colors.RED_400,
+                        ft.IconButton(ft.Icons.CANCEL_OUTLINED, tooltip="Не пришёл",
+                                      icon_color=ft.Colors.RED_400,
                                       on_click=lambda _, eid=ev["id"]: self._mark_attendance(eid, "missed")),
-                        ft.IconButton(ft.icons.EDIT, tooltip="Изменить",
+                        ft.IconButton(ft.Icons.EDIT, tooltip="Изменить",
                                       on_click=lambda _, e=ev: self._show_edit_dialog(e)),
-                        ft.IconButton(ft.icons.DELETE_OUTLINE, tooltip="Удалить",
-                                      icon_color=ft.colors.RED_300,
+                        ft.IconButton(ft.Icons.DELETE_OUTLINE, tooltip="Удалить",
+                                      icon_color=ft.Colors.RED_300,
                                       on_click=lambda _, eid=ev["id"]: self._delete_event_wrapper(eid)),
                     ], spacing=0),
                 ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                 ft.Text(f"{ev['client_name']}", weight=ft.FontWeight.W_500, size=14),
-                ft.Text(info_text, size=12, color=ft.colors.GREY_400),
-                ft.Text(f"{att_icon} {att_text}", size=11, color=ft.colors.GREY_500) if not notes else ft.Text(""),
-                ft.Text(notes, size=11, color=ft.colors.GREY_400),
+                ft.Text(info_text, size=12, color=ft.Colors.GREY_400),
+                ft.Text(f"{att_icon} {att_text}", size=11, color=ft.Colors.GREY_500) if not notes else ft.Text(""),
+                ft.Text(notes, size=11, color=ft.Colors.GREY_400),
             ], spacing=2),
             padding=10,
             margin=ft.margin.only(bottom=8),
-            border=ft.border.all(1, ft.colors.GREY_700),
+            border=ft.border.all(1, ft.Colors.GREY_700),
             border_radius=8,
-            bgcolor=ft.colors.GREY_800,
+            bgcolor=ft.Colors.GREY_800,
         )
 
     def _mark_attendance(self, event_id: str, status: str):
@@ -251,7 +241,7 @@ class CalendarApp:
     def _refresh_events_and_ui(self):
         def _reload():
             try:
-                now = datetime.utcnow()
+                now = datetime.now(timezone.utc)
                 past = now - timedelta(days=7)
                 future = now + timedelta(days=90)
                 self._events = fetch_events(time_min=past, time_max=future)
@@ -268,7 +258,7 @@ class CalendarApp:
         if not events:
             return ft.Column([
                 ft.Text("📋 Сегодня", size=22, weight=ft.FontWeight.BOLD),
-                ft.Text("Нет записей на сегодня", color=ft.colors.GREY_400, size=16),
+                ft.Text("Нет записей на сегодня", color=ft.Colors.GREY_400, size=16),
             ])
 
         cards = [ft.Text(f"📋 Сегодня · {len(events)} записей", size=22, weight=ft.FontWeight.BOLD)]
@@ -286,10 +276,10 @@ class CalendarApp:
         week_dates = [week_start + timedelta(days=i) for i in range(7)]
 
         nav = ft.Row([
-            ft.IconButton(ft.icons.ARROW_BACK, on_click=self._week_prev),
+            ft.IconButton(ft.Icons.ARROW_BACK, on_click=self._week_prev),
             ft.Text(f"{format_date_ru(week_dates[0])} — {format_date_ru(week_dates[-1])}",
                     size=16, weight=ft.FontWeight.W_500),
-            ft.IconButton(ft.icons.ARROW_FORWARD, on_click=self._week_next),
+            ft.IconButton(ft.Icons.ARROW_FORWARD, on_click=self._week_next),
         ], alignment=ft.MainAxisAlignment.CENTER)
 
         rows = []
@@ -300,15 +290,15 @@ class CalendarApp:
                 key=lambda x: x["time"],
             )
             is_today = d == today
-            day_color = ft.colors.BLUE_300 if is_today else ft.colors.GREY_400
+            day_color = ft.Colors.BLUE_300 if is_today else ft.Colors.GREY_400
             cards = [ft.Text(WEEKDAY_NAMES[d.weekday()], size=12, weight=ft.FontWeight.W_600, color=day_color),
                      ft.Text(str(d.day), size=18, weight=ft.FontWeight.BOLD, color=day_color)]
             for ev in day_events:
                 cards.append(ft.Container(
                     content=ft.Text(f"{self._attendance_icon(ev.get('attendance',''))} {ev['time']} {ev['client_name']}",
                                     size=12),
-                    padding=5, border=ft.border.all(1, ft.colors.GREY_700),
-                    border_radius=4, bgcolor=ft.colors.GREY_800,
+                    padding=5, border=ft.border.all(1, ft.Colors.GREY_700),
+                    border_radius=4, bgcolor=ft.Colors.GREY_800,
                 ))
             rows.append(ft.Column(cards, horizontal_alignment=ft.CrossAxisAlignment.CENTER))
 
@@ -328,7 +318,7 @@ class CalendarApp:
 
     def _build_table_view(self) -> ft.Column:
         search = ft.TextField(hint_text="Поиск по имени или дате (ГГГГ-ММ-ДД)",
-                              prefix_icon=ft.icons.SEARCH, on_change=self._on_search)
+                              prefix_icon=ft.Icons.SEARCH, on_change=self._on_search)
 
         filtered = self._events
         if self._search_query:
@@ -340,7 +330,7 @@ class CalendarApp:
             return ft.Column([
                 ft.Text("📊 Таблица", size=22, weight=ft.FontWeight.BOLD),
                 search,
-                ft.Text("Записи не найдены", color=ft.colors.GREY_400),
+                ft.Text("Записи не найдены", color=ft.Colors.GREY_400),
             ])
 
         cards = [ft.Text("📊 Таблица", size=22, weight=ft.FontWeight.BOLD), search]
@@ -374,16 +364,16 @@ class CalendarApp:
             events_by_date.setdefault(e["date"], []).append(e)
 
         nav = ft.Row([
-            ft.IconButton(ft.icons.ARROW_BACK, on_click=self._cal_prev),
+            ft.IconButton(ft.Icons.ARROW_BACK, on_click=self._cal_prev),
             ft.Text(f"{MONTH_NAMES[self._cal_month]} {self._cal_year}",
                     size=18, weight=ft.FontWeight.W_500),
-            ft.IconButton(ft.icons.ARROW_FORWARD, on_click=self._cal_next),
+            ft.IconButton(ft.Icons.ARROW_FORWARD, on_click=self._cal_next),
         ], alignment=ft.MainAxisAlignment.CENTER)
 
         # Header
         header = ft.Row(
             [ft.Container(content=ft.Text(d, size=12, weight=ft.FontWeight.W_600,
-                                          color=ft.colors.GREY_400),
+                                          color=ft.Colors.GREY_400),
                            alignment=ft.alignment.center, expand=True)
              for d in WEEKDAY_NAMES]
         )
@@ -407,20 +397,20 @@ class CalendarApp:
                     if len(day_events) > 3:
                         dots += f"\n+{len(day_events) - 3}"
 
-                    color = ft.colors.BLUE_300 if is_today else ft.colors.GREY_100
+                    color = ft.Colors.BLUE_300 if is_today else ft.Colors.GREY_100
                     row_cells.append(ft.Container(
                         content=ft.Column([
                             ft.Text(str(day_num), size=14, weight=ft.FontWeight.BOLD,
                                     color=color),
-                            ft.Text(dots, size=9, color=ft.colors.GREY_400),
+                            ft.Text(dots, size=9, color=ft.Colors.GREY_400),
                         ]),
                         expand=True, height=80,
-                        border=ft.border.all(0.5, ft.colors.GREY_700),
+                        border=ft.border.all(0.5, ft.Colors.GREY_700),
                         padding=3,
                     ))
                 else:
                     row_cells.append(ft.Container(expand=True, height=80,
-                                                  border=ft.border.all(0.5, ft.colors.GREY_800)))
+                                                  border=ft.border.all(0.5, ft.Colors.GREY_800)))
 
             weeks.append(ft.Row(row_cells))
 

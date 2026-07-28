@@ -1,25 +1,15 @@
 import os
 import json
-import secrets
-import webbrowser
-import urllib.parse
-import urllib.request
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+from google_auth_oauthlib.flow import InstalledAppFlow
 
-# При сборке .exe заменить на вшитые значения:
-# CLIENT_ID = "ваш_client_id"
-# CLIENT_SECRET = "ваш_client_secret"
+# Перед .exe сборкой: заменить на вшитые значения
 CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
-AUTHORIZE_ENDPOINT = "https://accounts.google.com/o/oauth2/auth"
-TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
-REDIRECT_URI = "http://localhost:8080"
 
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".calendar_app")
 TOKEN_FILE = os.path.join(CONFIG_DIR, "token.json")
@@ -48,105 +38,29 @@ def _delete_token():
         os.remove(TOKEN_FILE)
 
 
-# ── OAuth callback server ──────────────────────────────────
-
-_code_event = threading.Event()
-_code_result = None
-
-
-class OAuthHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        global _code_result
-        parsed = urllib.parse.urlparse(self.path)
-        params = urllib.parse.parse_qs(parsed.query)
-
-        if "code" in params:
-            _code_result = params["code"][0]
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(
-                "<h2>Авторизация завершена!</h2>"
-                "<p>Можете закрыть это окно и вернуться в приложение.</p>"
-                "<script>window.close()</script>".encode("utf-8")
-            )
-            _code_event.set()
-        elif "error" in params:
-            _code_result = None
-            self.send_response(400)
-            self.send_header("Content-Type", "text/plain")
-            self.end_headers()
-            self.wfile.write(f"Error: {params['error'][0]}".encode())
-            _code_event.set()
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-    def log_message(self, format, *args):
-        pass
-
-
-def _run_server(server):
-    while not _code_event.is_set():
-        server.handle_request()
-
-
-def _check_creds():
-    if not CLIENT_ID or not CLIENT_SECRET:
-        raise RuntimeError(
-            "Не настроены GOOGLE_CLIENT_ID и GOOGLE_CLIENT_SECRET.\n"
-            "Перед сборкой .exe пропишите их в desktop/auth_handler.py"
-        )
-
-
-def build_google_auth_url() -> str:
-    _check_creds()
-    state = secrets.token_urlsafe(32)
-    return AUTHORIZE_ENDPOINT + "?" + urllib.parse.urlencode({
-        "client_id": CLIENT_ID,
-        "redirect_uri": REDIRECT_URI,
-        "response_type": "code",
-        "scope": " ".join(SCOPES),
-        "state": state,
-        "access_type": "offline",
-        "prompt": "select_account",
-    })
-
-
 def login() -> bool:
-    _check_creds()
-    global _code_event, _code_result
-    _code_event = threading.Event()
-    _code_result = None
-
-    server = HTTPServer(("localhost", 8080), OAuthHandler)
-    auth_url = build_google_auth_url()
-    webbrowser.open(auth_url)
-
-    server_thread = threading.Thread(target=_run_server, args=(server,), daemon=True)
-    server_thread.start()
-
-    _code_event.wait(timeout=300)
-    server.server_close()
-
-    if not _code_result:
+    if not CLIENT_ID or not CLIENT_SECRET:
         return False
 
-    body = urllib.parse.urlencode({
-        "code": _code_result,
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "redirect_uri": REDIRECT_URI,
-        "grant_type": "authorization_code",
-    }).encode()
-
-    req = urllib.request.Request(TOKEN_ENDPOINT, data=body, method="POST")
-    req.add_header("Content-Type", "application/x-www-form-urlencoded")
+    flow = InstalledAppFlow.from_client_config(
+        {
+            "installed": {
+                "client_id": CLIENT_ID,
+                "client_secret": CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+            }
+        },
+        scopes=SCOPES,
+    )
 
     try:
-        resp = urllib.request.urlopen(req)
-        token = json.loads(resp.read().decode())
-        _save_token(token)
+        creds = flow.run_local_server(port=8080, open_browser=True)
+        _save_token({
+            "access_token": creds.token,
+            "refresh_token": creds.refresh_token,
+            "expires_at": creds.expiry.timestamp() if creds.expiry else None,
+        })
         return True
     except Exception:
         return False
@@ -161,7 +75,7 @@ def get_credentials() -> Credentials | None:
         creds = Credentials(
             token=token.get("access_token"),
             refresh_token=token.get("refresh_token"),
-            token_uri=TOKEN_ENDPOINT,
+            token_uri="https://oauth2.googleapis.com/token",
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
             scopes=SCOPES,
