@@ -13,7 +13,6 @@ from calendar_manager import (
     update_event,
     delete_event,
     set_attendance,
-    check_availability,
 )
 
 WEEKDAY_NAMES = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
@@ -534,7 +533,6 @@ class CalendarApp:
 
     def _close_dialog(self, dialog):
         dialog.open = False
-        self.page.overlay.clear()
         self.page.update()
 
     def _save_booking(self, dialog, ev, name, phone, service, date_picker, time_picker, duration, notes, is_edit):
@@ -551,9 +549,6 @@ class CalendarApp:
                 update_event(ev["id"], name.value.strip(), phone.value.strip(),
                              service.value, date_str, time_str, dur, notes.value)
             else:
-                if not check_availability(date_str, time_str, dur):
-                    self._show_dialog_error("Слот занят")
-                    return
                 create_event(name.value.strip(), phone.value.strip(),
                              service.value, date_str, time_str, dur, notes.value)
 
