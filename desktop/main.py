@@ -527,12 +527,14 @@ class CalendarApp:
                                                                          duration, notes, is_edit)),
             ],
         )
-        self.page.dialog = dialog
         dialog.open = True
+        self.page.overlay.append(dialog)
         self.page.update()
 
     def _close_dialog(self, dialog):
         dialog.open = False
+        if dialog in self.page.overlay:
+            self.page.overlay.remove(dialog)
         self.page.update()
 
     def _save_booking(self, dialog, ev, name, phone, service, date_picker, time_picker, duration, notes, is_edit):
