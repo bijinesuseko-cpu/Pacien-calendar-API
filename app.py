@@ -248,6 +248,15 @@ def attendance_icon(status: str) -> str:
     return {"arrived": "✅", "missed": "❌"}.get(status, "⏳")
 
 
+def _handle_api_error(e: Exception) -> bool:
+    """Если токен протух — очистить сессию и перезагрузить."""
+    if "TOKEN_EXPIRED" in str(e):
+        revoke_token()
+        st.rerun()
+        return True
+    return False
+
+
 
 def render_today_view(events: list[dict]):
     today_str = date.today().isoformat()
@@ -280,12 +289,20 @@ def render_today_view(events: list[dict]):
                 b1, b2, b3 = st.columns(3)
                 with b1:
                     if st.button("✅", key=f"arr_{ev['id']}", help="Пришёл"):
-                        set_attendance(ev["id"], "arrived")
-                        st.rerun()
+                        try:
+                            set_attendance(ev["id"], "arrived")
+                            st.rerun()
+                        except RuntimeError as e:
+                            if not _handle_api_error(e):
+                                st.error(str(e))
                 with b2:
                     if st.button("❌", key=f"miss_{ev['id']}", help="Не пришёл"):
-                        set_attendance(ev["id"], "missed")
-                        st.rerun()
+                        try:
+                            set_attendance(ev["id"], "missed")
+                            st.rerun()
+                        except RuntimeError as e:
+                            if not _handle_api_error(e):
+                                st.error(str(e))
                 with b3:
                     if st.button("✏️", key=f"edit_today_{ev['id']}", help="Редактировать"):
                         st.session_state["editing_event"] = ev
@@ -392,12 +409,20 @@ def render_table_view(events: list[dict]):
                 b1, b2 = st.columns(2)
                 with b1:
                     if st.button("✅", key=f"arr_tab_{ev['id']}", help="Пришёл"):
-                        set_attendance(ev["id"], "arrived")
-                        st.rerun()
+                        try:
+                            set_attendance(ev["id"], "arrived")
+                            st.rerun()
+                        except RuntimeError as e:
+                            if not _handle_api_error(e):
+                                st.error(str(e))
                 with b2:
                     if st.button("❌", key=f"miss_tab_{ev['id']}", help="Не пришёл"):
-                        set_attendance(ev["id"], "missed")
-                        st.rerun()
+                        try:
+                            set_attendance(ev["id"], "missed")
+                            st.rerun()
+                        except RuntimeError as e:
+                            if not _handle_api_error(e):
+                                st.error(str(e))
                 b3, b4 = st.columns(2)
                 with b3:
                     if st.button("✏️", key=f"edit_tab_{ev['id']}", help="Изменить"):
@@ -409,7 +434,8 @@ def render_table_view(events: list[dict]):
                             delete_event(ev["id"])
                             st.rerun()
                         except RuntimeError as e:
-                            st.error(str(e))
+                            if not _handle_api_error(e):
+                                st.error(str(e))
         st.divider()
 
 
@@ -542,12 +568,20 @@ def render_calendar_view(events: list[dict]):
                         c4a, c4b, c4c = st.columns(3)
                         with c4a:
                             if st.button("✅", key=f"arr_cal_{ev['id']}", help="Пришёл"):
-                                set_attendance(ev["id"], "arrived")
-                                st.rerun()
+                                try:
+                                    set_attendance(ev["id"], "arrived")
+                                    st.rerun()
+                                except RuntimeError as e:
+                                    if not _handle_api_error(e):
+                                        st.error(str(e))
                         with c4b:
                             if st.button("❌", key=f"miss_cal_{ev['id']}", help="Не пришёл"):
-                                set_attendance(ev["id"], "missed")
-                                st.rerun()
+                                try:
+                                    set_attendance(ev["id"], "missed")
+                                    st.rerun()
+                                except RuntimeError as e:
+                                    if not _handle_api_error(e):
+                                        st.error(str(e))
                         with c4c:
                             if st.button("✏️", key=f"edit_cal_{ev['id']}", help="Изменить"):
                                 st.session_state["editing_event"] = ev
@@ -602,7 +636,8 @@ def edit_event_form():
                     del st.session_state["editing_event"]
                     st.rerun()
                 except RuntimeError as e:
-                    st.error(str(e))
+                    if not _handle_api_error(e):
+                        st.error(str(e))
 
         if submitted:
             if not client_name.strip():
@@ -617,6 +652,8 @@ def edit_event_form():
                 del st.session_state["editing_event"]
                 st.rerun()
             except (ValueError, RuntimeError) as e:
+                if isinstance(e, RuntimeError) and _handle_api_error(e):
+                    return
                 st.error(str(e))
 
 
@@ -691,6 +728,8 @@ def booking_form(default_date: date | None = None, form_key: str = "booking_form
                 create_event(client_name.strip(), phone.strip(), service, date_str, time_str, duration, notes)
                 st.rerun()
             except (ValueError, RuntimeError) as e:
+                if isinstance(e, RuntimeError) and _handle_api_error(e):
+                    return
                 st.error(str(e))
 
 
@@ -731,7 +770,8 @@ def main():
         future = now + timedelta(days=90)
         events = fetch_events(time_min=past, time_max=future)
     except RuntimeError as e:
-        st.error(f"Ошибка загрузки событий: {e}")
+        if not _handle_api_error(e):
+            st.error(f"Ошибка загрузки событий: {e}")
         st.stop()
 
     st.sidebar.divider()

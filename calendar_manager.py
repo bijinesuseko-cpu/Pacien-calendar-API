@@ -8,6 +8,7 @@ SERVICE_NAME = "calendar"
 API_VERSION = "v3"
 CALENDAR_ID = "7c2f32ceea7072ff8714c24c0cb67133502f33896ee226583b55b707dcd60ccf@group.calendar.google.com"
 EVENT_PREFIX = "[BOOKING] "
+TOKEN_EXPIRED = "TOKEN_EXPIRED"
 
 
 def get_service():
@@ -34,6 +35,8 @@ def fetch_events(time_min: datetime | None = None, time_max: datetime | None = N
     try:
         events_result = service.events().list(**params).execute()
     except HttpError as e:
+        if e.resp.status == 400:
+            raise RuntimeError(TOKEN_EXPIRED)
         if e.resp.status == 429:
             raise RuntimeError("Превышен лимит запросов Google API. Попробуйте позже.")
         if e.resp.status in (403, 404):
@@ -116,6 +119,8 @@ def check_availability(date_str: str, time_str: str, duration_minutes: int = 60)
             maxResults=50,
         ).execute()
     except HttpError as e:
+        if e.resp.status == 400:
+            raise RuntimeError(TOKEN_EXPIRED)
         if e.resp.status == 429:
             raise RuntimeError("Превышен лимит запросов Google API. Попробуйте позже.")
         if e.resp.status in (403, 404):
@@ -167,6 +172,8 @@ def create_event(client_name: str, phone: str, service_name: str, date_str: str,
     try:
         created = service.events().insert(calendarId=CALENDAR_ID, body=event_body).execute()
     except HttpError as e:
+        if e.resp.status == 400:
+            raise RuntimeError(TOKEN_EXPIRED)
         if e.resp.status == 429:
             raise RuntimeError("Превышен лимит запросов Google API. Попробуйте позже.")
         raise RuntimeError(f"Не удалось создать событие: {e}")
@@ -202,6 +209,8 @@ def update_event(event_id: str, client_name: str, phone: str, service_name: str,
     try:
         updated = service.events().update(calendarId=CALENDAR_ID, eventId=event_id, body=event_body).execute()
     except HttpError as e:
+        if e.resp.status == 400:
+            raise RuntimeError(TOKEN_EXPIRED)
         if e.resp.status == 429:
             raise RuntimeError("Превышен лимит запросов Google API. Попробуйте позже.")
         raise RuntimeError(f"Не удалось обновить событие: {e}")
@@ -214,6 +223,8 @@ def delete_event(event_id: str) -> None:
     try:
         service.events().delete(calendarId=CALENDAR_ID, eventId=event_id).execute()
     except HttpError as e:
+        if e.resp.status == 400:
+            raise RuntimeError(TOKEN_EXPIRED)
         if e.resp.status == 429:
             raise RuntimeError("Превышен лимит запросов Google API. Попробуйте позже.")
         raise RuntimeError(f"Не удалось удалить событие: {e}")
@@ -224,6 +235,8 @@ def set_attendance(event_id: str, attendance: str) -> dict:
     try:
         event = service.events().get(calendarId=CALENDAR_ID, eventId=event_id).execute()
     except HttpError as e:
+        if e.resp.status == 400:
+            raise RuntimeError(TOKEN_EXPIRED)
         raise RuntimeError(f"Не удалось получить событие: {e}")
 
     description = event.get("description", "")
@@ -244,6 +257,8 @@ def set_attendance(event_id: str, attendance: str) -> dict:
     try:
         updated = service.events().update(calendarId=CALENDAR_ID, eventId=event_id, body=event).execute()
     except HttpError as e:
+        if e.resp.status == 400:
+            raise RuntimeError(TOKEN_EXPIRED)
         raise RuntimeError(f"Не удалось обновить событие: {e}")
 
     return _parse_event(updated)
