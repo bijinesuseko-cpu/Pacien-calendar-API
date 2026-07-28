@@ -745,6 +745,11 @@ def main():
             "<div style='font-size:3rem; margin-bottom:1rem;'>📅</div>"
             "<h2 style='color:var(--text-primary);'>Календарь записей</h2>"
             "<p style='color:var(--text-secondary);'>Войдите через Google для доступа к записям</p>"
+            "<a href='/login' target='_self' style='"
+            "display:inline-block;background:#dc2626;color:#fff;border:none;border-radius:8px;"
+            "padding:10px 32px;font-size:15px;font-weight:600;text-decoration:none;"
+            "box-shadow:0 2px 6px rgba(220,38,38,0.35);margin-top:1rem;'>"
+            "Войти через Google</a>"
             "</div>",
             unsafe_allow_html=True,
         )
