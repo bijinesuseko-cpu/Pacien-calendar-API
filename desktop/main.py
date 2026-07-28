@@ -2,7 +2,6 @@ import os
 import sys
 import threading
 from datetime import datetime, date, timedelta
-from typing import Optional
 
 import flet as ft
 
@@ -57,48 +56,10 @@ class CalendarApp:
         )
 
     def _check_auth(self):
-        status = auth_handler.get_config_status()
-
-        if not status["has_config"]:
-            self._show_setup()
-            return
-
-        if not auth_handler.is_authenticated():
-            self._show_login()
-        else:
+        if auth_handler.is_authenticated():
             self._load_and_show()
-
-    # ── Setup screen (first launch) ────────────────────────
-
-    def _show_setup(self):
-        self.page.clean()
-        client_id = ft.TextField(label="Google Client ID", width=400)
-        client_secret = ft.TextField(label="Google Client Secret", width=400, password=True)
-        error = ft.Text(color=ft.colors.RED_400)
-
-        def on_save(e):
-            if not client_id.value or not client_secret.value:
-                error.value = "Заполните оба поля"
-                self.page.update()
-                return
-            auth_handler._save_client_secrets(client_id.value.strip(), client_secret.value.strip())
+        else:
             self._show_login()
-
-        self.page.add(
-            ft.Container(
-                content=ft.Column([
-                    ft.Text("🔐 Настройка приложения", size=24, weight=ft.FontWeight.BOLD),
-                    ft.Text("Введите данные OAuth из Google Cloud Console", size=14),
-                    ft.Divider(height=20),
-                    client_id,
-                    client_secret,
-                    error,
-                    ft.ElevatedButton("Сохранить", on_click=on_save, width=400),
-                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                alignment=ft.alignment.center,
-                expand=True,
-            )
-        )
 
     def _show_login(self):
         self.page.clean()
@@ -112,8 +73,8 @@ class CalendarApp:
             def _do_login():
                 success = auth_handler.login()
                 if success:
-                    self.page.add(ft.Text("✅ Вход выполнен! Загружаем данные..."))
-                    status_text.value = "✅ Успешно!"
+                    status_text.value = "✅ Успешно! Загружаем данные..."
+                    status_text.color = ft.colors.GREEN_400
                     self.page.update()
                     self._load_and_show()
                 else:

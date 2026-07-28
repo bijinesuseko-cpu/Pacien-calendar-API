@@ -1,6 +1,5 @@
 import os
 import json
-import time
 import secrets
 import webbrowser
 import urllib.parse
@@ -12,6 +11,11 @@ from datetime import datetime
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 
+# При сборке .exe заменить на вшитые значения:
+# CLIENT_ID = "ваш_client_id"
+# CLIENT_SECRET = "ваш_client_secret"
+CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 AUTHORIZE_ENDPOINT = "https://accounts.google.com/o/oauth2/auth"
 TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
@@ -19,37 +23,10 @@ REDIRECT_URI = "http://localhost:8080"
 
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".calendar_app")
 TOKEN_FILE = os.path.join(CONFIG_DIR, "token.json")
-CLIENT_SECRETS_FILE = os.path.join(CONFIG_DIR, "client_secrets.json")
-
-_client_id = None
-_client_secret = None
 
 
 def _ensure_config_dir():
     os.makedirs(CONFIG_DIR, exist_ok=True)
-
-
-def _load_client_secrets():
-    global _client_id, _client_secret
-    if _client_id and _client_secret:
-        return True
-    try:
-        with open(CLIENT_SECRETS_FILE) as f:
-            data = json.load(f)
-            _client_id = data.get("client_id")
-            _client_secret = data.get("client_secret")
-        return bool(_client_id and _client_secret)
-    except Exception:
-        return False
-
-
-def _save_client_secrets(client_id: str, client_secret: str):
-    global _client_id, _client_secret
-    _client_id = client_id
-    _client_secret = client_secret
-    _ensure_config_dir()
-    with open(CLIENT_SECRETS_FILE, "w") as f:
-        json.dump({"client_id": client_id, "client_secret": client_secret}, f)
 
 
 def _save_token(token: dict):
@@ -106,7 +83,7 @@ class OAuthHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def log_message(self, format, *args):
-        pass  # тихий режим
+        pass
 
 
 def _run_server(server):
@@ -114,10 +91,19 @@ def _run_server(server):
         server.handle_request()
 
 
+def _check_creds():
+    if not CLIENT_ID or not CLIENT_SECRET:
+        raise RuntimeError(
+            "Не настроены GOOGLE_CLIENT_ID и GOOGLE_CLIENT_SECRET.\n"
+            "Перед сборкой .exe пропишите их в desktop/auth_handler.py"
+        )
+
+
 def build_google_auth_url() -> str:
+    _check_creds()
     state = secrets.token_urlsafe(32)
     return AUTHORIZE_ENDPOINT + "?" + urllib.parse.urlencode({
-        "client_id": _client_id,
+        "client_id": CLIENT_ID,
         "redirect_uri": REDIRECT_URI,
         "response_type": "code",
         "scope": " ".join(SCOPES),
@@ -128,15 +114,12 @@ def build_google_auth_url() -> str:
 
 
 def login() -> bool:
-    if not _load_client_secrets():
-        return False
-
+    _check_creds()
     global _code_event, _code_result
     _code_event = threading.Event()
     _code_result = None
 
     server = HTTPServer(("localhost", 8080), OAuthHandler)
-
     auth_url = build_google_auth_url()
     webbrowser.open(auth_url)
 
@@ -151,8 +134,8 @@ def login() -> bool:
 
     body = urllib.parse.urlencode({
         "code": _code_result,
-        "client_id": _client_id,
-        "client_secret": _client_secret,
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
         "redirect_uri": REDIRECT_URI,
         "grant_type": "authorization_code",
     }).encode()
@@ -170,7 +153,7 @@ def login() -> bool:
 
 
 def get_credentials() -> Credentials | None:
-    token = _load_token() or None
+    token = _load_token()
     if not token:
         return None
 
@@ -179,8 +162,8 @@ def get_credentials() -> Credentials | None:
             token=token.get("access_token"),
             refresh_token=token.get("refresh_token"),
             token_uri=TOKEN_ENDPOINT,
-            client_id=_client_id,
-            client_secret=_client_secret,
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
             scopes=SCOPES,
         )
 
@@ -206,25 +189,11 @@ def get_credentials() -> Credentials | None:
 
 
 def is_authenticated() -> bool:
-    if not _load_client_secrets():
-        return False
     token = _load_token()
     if not token:
         return False
-    try:
-        creds = get_credentials()
-        return creds is not None
-    except Exception:
-        return False
+    return get_credentials() is not None
 
 
 def logout():
     _delete_token()
-
-
-def get_config_status() -> dict:
-    return {
-        "has_config": os.path.exists(CLIENT_SECRETS_FILE),
-        "has_token": os.path.exists(TOKEN_FILE),
-        "config_dir": CONFIG_DIR,
-    }
